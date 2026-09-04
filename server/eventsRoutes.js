@@ -19,7 +19,9 @@ export async function eventsRoutes(db, req, res, path, method, parts, json, send
       onCourt: raw.onCourt,
       onCourtByTeam: raw.onCourtByTeam,
       reds: raw.reds,
+      twoMinCount: raw.twoMinCount,
       activeSuspensions: raw.activeSuspensions,
+      passive: raw.passive,
     });
     return true;
   }
