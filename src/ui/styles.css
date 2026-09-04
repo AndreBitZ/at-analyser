@@ -1,0 +1,37 @@
+:root {
+  --bg: #0e1412;
+  --panel: #17211d;
+  --panel-2: #1e2b26;
+  --line: #2c3f37;
+  --text: #e8f0ec;
+  --muted: #9bb0a6;
+  --accent: #3dcf8e;
+  --warn: #e8c36a;
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: "Segoe UI", sans-serif; }
+.app { max-width: 1280px; margin: 0 auto; padding: 20px; }
+header h1 { margin: 0 0 4px; font-size: 1.45rem; }
+header p { margin: 0 0 18px; color: var(--muted); }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.tabs button { background: var(--panel); color: var(--text); border: 1px solid var(--line); padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.tabs button.active { background: var(--accent); color: #062016; font-weight: 700; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.card h3 { margin: 0 0 8px; font-size: 0.95rem; color: var(--muted); }
+.stat { font-size: 1.6rem; font-weight: 700; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+.heat { display: grid; gap: 4px; }
+.heat.field { grid-template-columns: repeat(5, 1fr); }
+.heat.goal { grid-template-columns: repeat(3, 1fr); }
+.cell { background: var(--panel-2); border-radius: 8px; padding: 8px; min-height: 64px; border: 1px solid var(--line); }
+.cell strong { display: block; }
+.matrix { overflow: auto; }
+.tag { display: inline-block; background: var(--panel-2); border: 1px solid var(--line); padding: 2px 6px; border-radius: 999px; font-size: 0.75rem; margin-right: 4px; }
+.note { font-size: 0.8rem; color: var(--warn); margin-top: 8px; }
+select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.narrative { line-height: 1.45; }
+.timeline { max-height: 420px; overflow: auto; }
