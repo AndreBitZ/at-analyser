@@ -3,6 +3,7 @@ import { historyRoutes } from "./historyRoutes.js";
 import { eventsRoutes } from "./eventsRoutes.js";
 import { squadRoutes } from "./squadRoutes.js";
 import { scoutRoutes } from "./scoutRoutes.js";
+import { improveRoutes } from "./improveRoutes.js";
 
 export async function extraRoutes(db, req, res, path, method, parts, json, send) {
   if (!db) return false;
@@ -10,6 +11,7 @@ export async function extraRoutes(db, req, res, path, method, parts, json, send)
   if (await eventsRoutes(db, req, res, path, method, parts, json, send)) return true;
   if (await squadRoutes(db, req, res, path, method, parts, json, send)) return true;
   if (await scoutRoutes(db, req, res, path, method, parts, json, send)) return true;
+  if (await improveRoutes(db, req, res, path, method, parts, json, send)) return true;
 
   if (method === "GET" && path === "/stats") {
     const one = async (sql) => Number((await db.execute(sql)).rows[0]?.n || 0);
