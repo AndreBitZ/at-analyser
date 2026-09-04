@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { get, patch, post } from "./adminApi";
 import { formatClock } from "../domain/time";
+import { StatsPanel, TimelinePanel } from "./MatchTimeline";
 
 const TYPES = [
   "SHOT", "ASSIST", "PRE_ASSIST", "TURNOVER", "STEAL", "INTERCEPTION", "RECOVERY",
@@ -168,6 +169,8 @@ export default function FichaJogo() {
               </div>
             </form>
           </div>
+          <StatsPanel events={events} homeId={match.home_team_id} awayId={match.away_team_id} homeName={match.home_team_name} awayName={match.away_team_name} />
+          <TimelinePanel events={events} stints={stints} players={players} />
           <div className="card" style={{ marginTop: 12 }}>
             <h3>Tempo em campo</h3>
             <table>
@@ -181,7 +184,7 @@ export default function FichaJogo() {
                     <tr key={row.player_id}>
                       <td>{row.player_name} {row.primary_position === "GK" ? "(GR)" : ""}</td>
                       <td>{minutesOf(stints, row.player_id, clockSec).toFixed(1)}</td>
-                      <td>{red ? "desqualificada" : sus ? `2 min` : live ? "em campo" : "banco"}</td>
+                      <td>{red ? "desqualificada" : sus ? "2 min" : live ? "em campo" : "banco"}</td>
                       <td>{live ? <button type="button" onClick={() => inOut(row, "out")}>Sair</button> : <button type="button" onClick={() => inOut(row, "in")}>Entrar</button>}</td>
                     </tr>
                   );
