@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import WorkspaceGate from "./WorkspaceGate";
 import { Atletas, Campeonatos, Clubes, Epocas, Geral, Jogos } from "./Pages";
 import FichaJogo from "./FichaJogo";
@@ -8,6 +8,7 @@ import WatchlistPage from "./WatchlistPage";
 import SearchPage from "./SearchPage";
 import ScorecardPage from "./ScorecardPage";
 import { post } from "./adminApi";
+import { api } from "../data/sqliteApi";
 
 type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha" | "ihf" | "relatorio" | "watch" | "search" | "card";
 
@@ -15,12 +16,19 @@ export default function App() {
   const [root, setRoot] = useState<string | null>(null);
   const [page, setPage] = useState<Page>("geral");
   const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    api("/health").then((h) => {
+      if (h.ready && (h.mode === "turso" || h.root)) setRoot(h.root || "turso");
+    }).catch(() => {});
+  }, []);
+
   if (!root) return <WorkspaceGate onReady={setRoot} />;
 
   async function backup() {
     try {
       const r = await post("/backup", {});
-      setMsg(`Cópia em ${r.file}`);
+      setMsg(`Cópia em ${r.file || "Turso"}`);
     } catch (e: any) { setMsg(e.message); }
   }
 
@@ -32,7 +40,7 @@ export default function App() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">AT Analyser</div>
-        <p className="side-path" title={root}>{root}</p>
+        <p className="side-path" title={root}>{root === "turso" ? "Base na nuvem (Vercel + Turso)" : root}</p>
         <nav>
           <p className="muted">Arquivo</p>
           <Btn id="geral" label="Geral" />
@@ -50,8 +58,8 @@ export default function App() {
           <Btn id="card" label="Scorecard" />
           <Btn id="watch" label="Watchlist" />
         </nav>
-        <button type="button" className="ghost" onClick={backup}>Cópia de segurança</button>
-        <button type="button" className="ghost" onClick={() => setRoot(null)}>Mudar pasta</button>
+        {root !== "turso" && <button type="button" className="ghost" onClick={backup}>Cópia de segurança</button>}
+        {root !== "turso" && <button type="button" className="ghost" onClick={() => setRoot(null)}>Mudar pasta</button>}
         {msg && <p className="side-path">{msg}</p>}
       </aside>
       <main className="main">
