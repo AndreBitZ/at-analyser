@@ -1,11 +1,12 @@
 {
   "name": "at-analyser",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "server": "node server/index.js",
+    "start": "node scripts/start.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run"
