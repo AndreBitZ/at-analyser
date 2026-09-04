@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { extname } from "node:path";
 import { id, row, rows } from "./db.js";
 import { getWorkspace, openWorkspace, mediaPath } from "./workspace.js";
+import { armTimer, loadSettings, runBackup, saveSettings, status } from "./backup.js";
 
 async function json(req) {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
@@ -12,14 +13,13 @@ async function json(req) {
 }
 
 function send(res, status, body) {
-  const payload = JSON.stringify(body);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   });
-  res.end(payload);
+  res.end(JSON.stringify(body));
 }
 
 export async function handleApi(db, req, res) {
@@ -31,30 +31,32 @@ export async function handleApi(db, req, res) {
   try {
     if (method === "GET" && path === "/health") {
       const ws = getWorkspace();
-      send(res, 200, { ok: true, mode: "local-sqlite", ready: ws.ready, root: ws.root });
-      return;
+      send(res, 200, { ok: true, mode: "local-sqlite", ready: ws.ready, root: ws.root }); return;
     }
-    if (method === "GET" && path === "/workspace") {
-      send(res, 200, getWorkspace()); return;
-    }
+    if (method === "GET" && path === "/workspace") { send(res, 200, getWorkspace()); return; }
     if (method === "POST" && path === "/workspace") {
       const b = await json(req);
       const opened = await openWorkspace(b.root);
+      armTimer();
       send(res, 200, opened); return;
+    }
+    if (method === "GET" && path === "/backup") { send(res, 200, status()); return; }
+    if (method === "POST" && path === "/backup") {
+      const b = await json(req);
+      send(res, 200, saveSettings(b)); return;
+    }
+    if (method === "POST" && path === "/backup/run") {
+      send(res, 200, runBackup()); return;
     }
     if (method === "POST" && path === "/media") {
       if (!getWorkspace().ready) { send(res, 409, { error: "Escolhe a pasta de dados primeiro" }); return; }
       const b = await json(req);
       const folder = String(b.folder || "logos").replace(/\.\./g, "");
       const filename = String(b.filename || `ficheiro${Date.now()}`).replace(/[/\\]/g, "_");
-      const buf = Buffer.from(b.base64 || "", "base64");
-      const dest = mediaPath(folder, filename);
-      writeFileSync(dest, buf);
+      writeFileSync(mediaPath(folder, filename), Buffer.from(b.base64 || "", "base64"));
       send(res, 201, { path: `${folder}/${filename}`, ext: extname(filename) }); return;
     }
-    if (!db) {
-      send(res, 409, { error: "Escolhe a pasta de dados no ecrã inicial." }); return;
-    }
+    if (!db) { send(res, 409, { error: "Escolhe a pasta de dados no ecrã inicial." }); return; }
     if (method === "GET" && path === "/export") {
       const dump = {};
       for (const table of ["clubs","age_groups","seasons","championships","teams","championship_teams","players","player_age_groups","player_team_season","matches"]) {
@@ -70,9 +72,7 @@ export async function handleApi(db, req, res) {
     }
     if (path === "/age-groups" && method === "GET") {
       const clubId = url.searchParams.get("club_id");
-      send(res, 200, rows(await db.execute(clubId
-        ? { sql: "SELECT * FROM age_groups WHERE club_id = ? ORDER BY code", args: [clubId] }
-        : { sql: "SELECT * FROM age_groups ORDER BY code", args: [] }))); return;
+      send(res, 200, rows(await db.execute(clubId ? { sql: "SELECT * FROM age_groups WHERE club_id = ? ORDER BY code", args: [clubId] } : { sql: "SELECT * FROM age_groups ORDER BY code", args: [] }))); return;
     }
     if (path === "/age-groups" && method === "POST") {
       const b = await json(req); const agId = b.id || id("ag");
@@ -122,20 +122,6 @@ export async function handleApi(db, req, res) {
         await db.execute({ sql: "INSERT OR IGNORE INTO player_age_groups (player_id, age_group_id) VALUES (?, ?)", args: [pid, gid] });
       }
       send(res, 201, { id: pid }); return;
-    }
-    if (path === "/player-age-groups" && method === "POST") {
-      const b = await json(req);
-      await db.execute({ sql: "INSERT OR IGNORE INTO player_age_groups (player_id, age_group_id) VALUES (?, ?)", args: [b.player_id, b.age_group_id] });
-      send(res, 201, { ok: true }); return;
-    }
-    if (parts[0] === "player-age-groups" && method === "DELETE" && parts.length === 3) {
-      await db.execute({ sql: "DELETE FROM player_age_groups WHERE player_id = ? AND age_group_id = ?", args: [parts[1], parts[2]] });
-      send(res, 200, { ok: true }); return;
-    }
-    if (path === "/rosters" && method === "POST") {
-      const b = await json(req);
-      await db.execute({ sql: "INSERT OR IGNORE INTO player_team_season (player_id, team_id, season_id) VALUES (?, ?, ?)", args: [b.player_id, b.team_id, b.season_id] });
-      send(res, 201, { ok: true }); return;
     }
     if (path === "/matches" && method === "GET") {
       send(res, 200, rows(await db.execute(`SELECT m.*, ht.name AS home_team_name, at.name AS away_team_name, ch.name AS championship_name, sz.label AS season_label FROM matches m JOIN teams ht ON ht.id = m.home_team_id JOIN teams at ON at.id = m.away_team_id LEFT JOIN championships ch ON ch.id = m.championship_id LEFT JOIN seasons sz ON sz.id = m.season_id ORDER BY m.kickoff_iso DESC`))); return;
