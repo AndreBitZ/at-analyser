@@ -1,37 +1,42 @@
 # AT Analyser
 
-Aplicação de análise de vídeo e performance de andebol.
+Análise de vídeo e performance de andebol.
+Repo: https://github.com/AndreBitZ/at-analyser
 
-Repositório: https://github.com/AndreBitZ/at-analyser
+## Base de dados no PC (recomendado para trabalho diário)
 
-## Arranque
+Os dados ficam no ficheiro local `data/at-analyser.db` (não vai para o Git).
 
 ```bash
 npm install
-npm test
-npm run dev
+npm run server    # API em http://localhost:8787
+npm run dev       # UI em http://localhost:5173 (proxy /api → 8787)
 ```
 
-UI em `http://localhost:5173` com um jogo de amostra (`src/data/sample.ts`). Motor em `src/domain/`.
+No separador **Clube** podes:
+- criar clube e escalões
+- atribuir uma jogadora a **dois escalões**
+- criar épocas e campeonatos
+- criar equipas e inscrevê-las num campeonato
+- criar jogos ligados à época/campeonato
 
-## Spec coberta
+Exportar JSON: `GET http://localhost:8787/api/export`
 
-1. Jogo: `match_id`, `home_team_id`, `away_team_id`
-2. Blocos de 5 min (`P1_00_05`…`P2_55_60` + extra-time). `floor(t/300)`. Filtros FIRST/SECOND_HALF, LAST_15/10/5/2, CRUNCHTIME (`t>=3000` e `|\u0394|<=2`)
-3. Stints, minutos por bloco, utilização, ações/10 e /5 min
-4. Zonas Z1–Z9 e grupos
-5. Baliza 3×3 B1–B9 (obrigatória em GOAL/SAVED; null em MISSED/BLOCKED)
-6. Um SHOT alimenta atacante, rematador, defesa e GR (`related_shot_event_id`)
-7. Contexto: marcador antes da ação, casa/fora, numérico, passivo, 2'
-8–12. Fórmulas de remate, GR, contexto, passivo (6 passes) e 7x6
-13. Saldo da equipa durante presença em campo (nota de não-causalidade)
-14. Índice de Impacto de Jogo (IIJ) — não usa HPI
-15. Estatísticas de equipa
-16. Heat maps e matriz 9×9
-17. Scorecards com narrativa baseada em dados e fiabilidade
+## Vercel
 
-Golos em baliza vazia não entram na taxa individual do GR fora da baliza. Comparar IIJ só na mesma posição.
+A Vercel não guarda um ficheiro SQLite no disco. Para a app publicada persistir:
 
-## Próximo
+1. Cria uma base gratuita em https://turso.tech
+2. No projeto Vercel define:
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
+3. Faz deploy a partir deste repo
 
-Persistência, tagging sobre vídeo, clips por célula, mapa defensivo, export PDF.
+Sem essas variáveis, `/api` responde 503 e explica o que falta. A UI de análise (amostra) continua a funcionar.
+
+## Modelo
+
+`clubs` → `age_groups` → `teams`  
+`players` ↔ `player_age_groups` ↔ `age_groups` (N:N, dois escalões)  
+`seasons` → `championships` ↔ `championship_teams` ↔ `teams`  
+`matches` ligam época + campeonato + duas equipas
