@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --mac dmg dir"
+    "pack": "electron-builder --mac --arm64"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -15,9 +15,16 @@
   "build": {
     "appId": "pt.tojal.atanalyser",
     "productName": "AT Analyser",
+    "electronDownload": { "arch": "arm64" },
     "mac": {
       "category": "public.app-category.sports",
-      "target": ["dmg", "dir"]
+      "target": [
+        { "target": "dmg", "arch": ["arm64"] },
+        { "target": "dir", "arch": ["arm64"] }
+      ],
+      "artifactName": "${productName}-${version}-apple-silicon.${ext}",
+      "identity": null,
+      "hardenedRuntime": true
     },
     "files": ["main.mjs", "preload.cjs"]
   }
