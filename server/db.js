@@ -6,11 +6,21 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const schemaPath = resolve(here, "../db/schema.sql");
 
+export function isTurso() {
+  return Boolean(process.env.TURSO_DATABASE_URL);
+}
+
 export function sqlitePath() {
   return resolve(process.env.AT_ANALYSER_DB || resolve(here, "../data/at-analyser.db"));
 }
 
 export function createDb() {
+  if (isTurso()) {
+    return createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+  }
   const file = sqlitePath();
   mkdirSync(dirname(file), { recursive: true });
   return createClient({ url: `file:${file}` });
