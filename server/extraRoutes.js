@@ -1,9 +1,11 @@
 import { id, row, rows } from "./db.js";
 import { historyRoutes } from "./historyRoutes.js";
+import { eventsRoutes } from "./eventsRoutes.js";
 
 export async function extraRoutes(db, req, res, path, method, parts, json, send) {
   if (!db) return false;
   if (await historyRoutes(db, res, path, method, parts, send)) return true;
+  if (await eventsRoutes(db, req, res, path, method, parts, json, send)) return true;
 
   if (method === "GET" && path === "/stats") {
     const one = async (sql) => Number((await db.execute(sql)).rows[0]?.n || 0);
@@ -76,7 +78,7 @@ export async function extraRoutes(db, req, res, path, method, parts, json, send)
   }
   if (method === "PATCH" && parts[0] === "matches" && parts[1]) {
     const b = await json(req);
-    await db.execute({ sql: "UPDATE matches SET championship_id = COALESCE(?, championship_id), venue = COALESCE(?, venue), kickoff_iso = COALESCE(?, kickoff_iso), status = COALESCE(?, status) WHERE id = ?", args: [b.championship_id ?? null, b.venue ?? null, b.kickoff_iso ?? null, b.status ?? null, parts[1]] });
+    await db.execute({ sql: "UPDATE matches SET championship_id = COALESCE(?, championship_id), venue = COALESCE(?, venue), kickoff_iso = COALESCE(?, kickoff_iso), status = COALESCE(?, status), video_url = COALESCE(?, video_url) WHERE id = ?", args: [b.championship_id ?? null, b.venue ?? null, b.kickoff_iso ?? null, b.status ?? null, b.video_url ?? null, parts[1]] });
     send(res, 200, { ok: true }); return true;
   }
   if (method === "PATCH" && parts[0] === "teams" && parts[1]) {
