@@ -1,4 +1,5 @@
 import { id, rows } from "./db.js";
+import { applySanction, matchState } from "./rules.js";
 
 function blockOf(sec) {
   const i = Math.floor(Number(sec || 0) / 300);
@@ -7,6 +8,21 @@ function blockOf(sec) {
 }
 
 export async function eventsRoutes(db, req, res, path, method, parts, json, send) {
+  if (method === "GET" && path === "/match-state") {
+    const url = new URL(req.url, "http://local");
+    const matchId = url.searchParams.get("match_id");
+    const t = Number(url.searchParams.get("t") || 0);
+    if (!matchId) { send(res, 400, { error: "match_id" }); return true; }
+    const raw = await matchState(db, matchId, t);
+    send(res, 200, {
+      clock: raw.clock,
+      onCourt: raw.onCourt,
+      onCourtByTeam: raw.onCourtByTeam,
+      reds: raw.reds,
+      activeSuspensions: raw.activeSuspensions,
+    });
+    return true;
+  }
   if (method === "GET" && path === "/events") {
     const matchId = new URL(req.url, "http://local").searchParams.get("match_id");
     send(res, 200, rows(await db.execute(matchId
@@ -35,6 +51,7 @@ export async function eventsRoutes(db, req, res, path, method, parts, json, send
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [eid, b.match_id, ts, b.team_id, b.player_id || null, b.type, shot, ctx, b.clip_url || null, b.notes || null],
     });
+    await applySanction(db, { ...b, timestamp_seconds: ts, type: b.type });
     send(res, 201, { id: eid });
     return true;
   }
