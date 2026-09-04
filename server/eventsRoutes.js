@@ -22,6 +22,7 @@ export async function eventsRoutes(db, req, res, path, method, parts, json, send
       twoMinCount: raw.twoMinCount,
       activeSuspensions: raw.activeSuspensions,
       passive: raw.passive,
+      gk: raw.gk,
     });
     return true;
   }
