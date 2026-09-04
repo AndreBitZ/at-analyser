@@ -1,0 +1,24 @@
+{
+  "name": "at-analyser-mac",
+  "private": true,
+  "version": "0.3.0",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --mac dmg dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "pt.tojal.atanalyser",
+    "productName": "AT Analyser",
+    "mac": {
+      "category": "public.app-category.sports",
+      "target": ["dmg", "dir"]
+    },
+    "files": ["main.mjs", "preload.cjs"]
+  }
+}
