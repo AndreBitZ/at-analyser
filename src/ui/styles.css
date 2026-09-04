@@ -31,7 +31,10 @@ th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: lef
 .matrix { overflow: auto; }
 .tag { display: inline-block; background: var(--panel-2); border: 1px solid var(--line); padding: 2px 6px; border-radius: 999px; font-size: 0.75rem; margin-right: 4px; }
 .note { font-size: 0.8rem; color: var(--warn); margin-top: 8px; }
-select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+select, input { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; width: 100%; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .narrative { line-height: 1.45; }
 .timeline { max-height: 420px; overflow: auto; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+form button { background: var(--accent); color: #062016; border: 0; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; }
+code { font-size: 0.85em; }
