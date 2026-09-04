@@ -29,6 +29,17 @@ export async function migrate(db) {
     starter INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (match_id, player_id)
   )`);
+  await db.execute(`CREATE TABLE IF NOT EXISTS watchlist (
+    id TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL REFERENCES players(id),
+    status TEXT NOT NULL DEFAULT 'SEGUIR',
+    attack_note TEXT,
+    defense_note TEXT,
+    read_note TEXT,
+    rating INTEGER NOT NULL DEFAULT 3,
+    clips TEXT,
+    updated_at TEXT
+  )`);
 }
 
 export function id(prefix) {
