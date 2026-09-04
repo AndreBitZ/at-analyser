@@ -19,18 +19,24 @@ export default function App() {
 
   useEffect(() => {
     api("/health").then((h) => {
-      if (h.ready && (h.mode === "turso" || h.root)) setRoot(h.root || "turso");
+      if (h.ready && h.root && h.root !== "turso") setRoot(h.root);
     }).catch(() => {});
   }, []);
-
-  if (!root) return <WorkspaceGate onReady={setRoot} />;
 
   async function backup() {
     try {
       const r = await post("/backup", {});
-      setMsg(`Cópia em ${r.file || "Turso"}`);
+      setMsg(`Cópia em ${r.file}`);
+      await window.mac?.notify?.("Cópia feita", r.file || "Backup gravado");
     } catch (e: any) { setMsg(e.message); }
   }
+
+  useEffect(() => {
+    window.mac?.onBackup?.(backup);
+    window.mac?.onOpenFolder?.((p) => { if (p) setRoot(p); });
+  }, []);
+
+  if (!root) return <WorkspaceGate onReady={setRoot} />;
 
   const Btn = ({ id, label }: { id: Page; label: string }) => (
     <button className={page === id ? "on" : ""} onClick={() => setPage(id)}>{label}</button>
@@ -40,7 +46,7 @@ export default function App() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">AT Analyser</div>
-        <p className="side-path" title={root}>{root === "turso" ? "Base na nuvem (Vercel + Turso)" : root}</p>
+        <p className="side-path" title={root}>{root}</p>
         <nav>
           <p className="muted">Arquivo</p>
           <Btn id="geral" label="Geral" />
@@ -58,8 +64,9 @@ export default function App() {
           <Btn id="card" label="Scorecard" />
           <Btn id="watch" label="Watchlist" />
         </nav>
-        {root !== "turso" && <button type="button" className="ghost" onClick={backup}>Cópia de segurança</button>}
-        {root !== "turso" && <button type="button" className="ghost" onClick={() => setRoot(null)}>Mudar pasta</button>}
+        <button type="button" className="ghost" onClick={backup}>Cópia de segurança</button>
+        <button type="button" className="ghost" onClick={() => window.mac?.revealInFinder?.(root)}>Mostrar no Finder</button>
+        <button type="button" className="ghost" onClick={() => setRoot(null)}>Mudar pasta</button>
         {msg && <p className="side-path">{msg}</p>}
       </aside>
       <main className="main">
