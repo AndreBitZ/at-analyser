@@ -43,11 +43,30 @@ export async function applySanction(db, ev) {
   }
 }
 
+function describeGk(team, opp, teamHasSus) {
+  const gk = team.gkOn;
+  const field = team.field;
+  const oppField = opp.field;
+  const oppGk = opp.gkOn;
+  if (gk && field === 6 && oppGk && oppField === 6) return { code: "7v7_GK", label: "7×7 com GR" };
+  if (gk && field < 6) return { code: "INFERIORITY_GK", label: `Inferioridade com GR (${field}+GR)` };
+  if (!gk && field === 7 && oppGk && oppField === 6) return { code: "7v6", label: "Ataque 7×6 (GR fora)" };
+  if (!gk && teamHasSus && field === 6) return { code: "EMPTY_EQUALIZE", label: "GR fora para igualar exclusão" };
+  if (!gk && field >= 6) return { code: "EMPTY_GOAL", label: `Baliza vazia (${field} de campo)` };
+  if (gk) return { code: "GK_ON", label: `GR em campo (${field}+GR)` };
+  return { code: "NO_GK", label: "Sem GR em campo" };
+}
+
 export async function matchState(db, matchId, clock) {
   const t = Number(clock || 0);
+  const match = rows(await db.execute({ sql: "SELECT * FROM matches WHERE id = ?", args: [matchId] }))[0];
   const stints = rows(await db.execute({ sql: "SELECT * FROM stints WHERE match_id = ?", args: [matchId] }));
   const sus = rows(await db.execute({ sql: "SELECT * FROM suspensions WHERE match_id = ?", args: [matchId] }));
   const events = rows(await db.execute({ sql: "SELECT * FROM events WHERE match_id = ? ORDER BY timestamp_seconds, id", args: [matchId] }));
+  const plist = rows(await db.execute("SELECT id, is_goalkeeper, primary_position FROM players"));
+  const isGk = {};
+  for (const p of plist) isGk[p.id] = Number(p.is_goalkeeper) === 1 || p.primary_position === "GK";
+
   const reds = new Set(events.filter((e) => ["RED_CARD", "BLUE_CARD", "DISQUALIFICATION"].includes(e.type)).map((e) => e.player_id));
   const twoMinCount = {};
   for (const e of events.filter((x) => x.type === "TWO_MIN_RECEIVED")) {
@@ -57,7 +76,14 @@ export async function matchState(db, matchId, clock) {
   const onCourt = onCourtRows.map((s) => s.player_id);
   const activeSus = sus.filter((s) => s.start_timestamp <= t && t < s.end_timestamp);
   const byTeam = {};
-  for (const s of onCourtRows) byTeam[s.team_id] = (byTeam[s.team_id] || 0) + 1;
+  const shape = {};
+  for (const s of onCourtRows) {
+    byTeam[s.team_id] = (byTeam[s.team_id] || 0) + 1;
+    if (!shape[s.team_id]) shape[s.team_id] = { total: 0, field: 0, gkOn: false, gkId: null };
+    shape[s.team_id].total += 1;
+    if (isGk[s.player_id]) { shape[s.team_id].gkOn = true; shape[s.team_id].gkId = s.player_id; }
+    else shape[s.team_id].field += 1;
+  }
 
   let passive = { active: false, passes: 0, remaining: MAX_PASSES, warningAt: null };
   for (const e of events.filter((x) => x.timestamp_seconds <= t)) {
@@ -70,6 +96,14 @@ export async function matchState(db, matchId, clock) {
       passive = { active: false, passes: 0, remaining: MAX_PASSES, warningAt: null };
     }
   }
+
+  const homeId = match?.home_team_id;
+  const awayId = match?.away_team_id;
+  const empty = { total: 0, field: 0, gkOn: false, gkId: null };
+  const home = shape[homeId] || empty;
+  const away = shape[awayId] || empty;
+  const homeSus = activeSus.some((s) => s.team_id === homeId);
+  const awaySus = activeSus.some((s) => s.team_id === awayId);
 
   function canEnter(playerId, teamId) {
     if (reds.has(playerId)) return { ok: false, reason: "Desqualificada — não volta (IHF)" };
@@ -89,6 +123,10 @@ export async function matchState(db, matchId, clock) {
     twoMinCount,
     activeSuspensions: activeSus,
     passive,
+    gk: {
+      home: { ...home, situation: describeGk(home, away, homeSus) },
+      away: { ...away, situation: describeGk(away, home, awaySus) },
+    },
     canEnter,
   };
 }
