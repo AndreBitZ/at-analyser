@@ -3,6 +3,7 @@ import { api, probeSqlite } from "../data/sqliteApi";
 import BackupPanel from "./BackupPanel";
 
 type Box = Record<string, any[]>;
+type Fd = Record<string, string>;
 
 export default function ClubAdmin() {
   const [ok, setOk] = useState(false);
@@ -47,35 +48,35 @@ export default function ClubAdmin() {
     <div>
       <BackupPanel />
       <div className="grid" style={{ marginTop: 16 }}>
-        <FormCard title="Clube" onSubmit={(fd) => post("/clubs", fd)}>
+        <FormCard title="Clube" onSubmit={(fd: Fd) => post("/clubs", fd)}>
           <input name="name" placeholder="Nome do clube" required />
           <input name="city" placeholder="Cidade" />
         </FormCard>
-        <FormCard title="Escalão" onSubmit={(fd) => post("/age-groups", fd)}>
+        <FormCard title="Escalão" onSubmit={(fd: Fd) => post("/age-groups", fd)}>
           <Select name="club_id" options={db.clubs} labelKey="name" />
           <input name="code" placeholder="SUB14F" required />
           <input name="name" placeholder="Sub-14 feminino" required />
         </FormCard>
-        <FormCard title="Época" onSubmit={(fd) => post("/seasons", fd)}>
+        <FormCard title="Época" onSubmit={(fd: Fd) => post("/seasons", fd)}>
           <input name="label" placeholder="2025/26" required />
         </FormCard>
-        <FormCard title="Campeonato" onSubmit={(fd) => post("/championships", fd)}>
+        <FormCard title="Campeonato" onSubmit={(fd: Fd) => post("/championships", fd)}>
           <Select name="season_id" options={db.seasons} labelKey="label" />
           <input name="name" placeholder="Nome" required />
         </FormCard>
-        <FormCard title="Equipa" onSubmit={(fd) => post("/teams", fd)}>
+        <FormCard title="Equipa" onSubmit={(fd: Fd) => post("/teams", fd)}>
           <Select name="club_id" options={db.clubs} labelKey="name" />
           <Select name="age_group_id" options={db.age_groups} labelKey="name" />
           <input name="name" placeholder="Nome da equipa" required />
         </FormCard>
-        <FormCard title="Jogadora (2 escalões)" onSubmit={(fd) => post("/players", { ...fd, age_group_ids: [fd.age_group_id, fd.age_group_id_2].filter(Boolean), is_goalkeeper: fd.primary_position === "GK" })}>
+        <FormCard title="Jogadora (2 escalões)" onSubmit={(fd: Fd) => post("/players", { ...fd, age_group_ids: [fd.age_group_id, fd.age_group_id_2].filter(Boolean), is_goalkeeper: fd.primary_position === "GK" })}>
           <Select name="club_id" options={db.clubs} labelKey="name" />
           <input name="name" placeholder="Nome" required />
           <select name="primary_position" defaultValue="CB">{["LW","LB","CB","RB","RW","PV","GK"].map((p) => <option key={p}>{p}</option>)}</select>
           <Select name="age_group_id" options={db.age_groups} labelKey="name" />
           <Select name="age_group_id_2" options={db.age_groups} labelKey="name" allowEmpty placeholder="2.º escalão" />
         </FormCard>
-        <FormCard title="Jogo" onSubmit={(fd) => post("/matches", fd)}>
+        <FormCard title="Jogo" onSubmit={(fd: Fd) => post("/matches", fd)}>
           <Select name="championship_id" options={db.championships} labelKey="name" allowEmpty />
           <Select name="home_team_id" options={db.teams} labelKey="name" />
           <Select name="away_team_id" options={db.teams} labelKey="name" />
@@ -84,24 +85,30 @@ export default function ClubAdmin() {
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Jogadoras</h3>
         <table><thead><tr><th>Nome</th><th>Escalões</th></tr></thead>
-        <tbody>{db.players.map((p) => <tr key={p.id}><td>{p.name}</td><td>{(p.age_groups || []).map((g: any) => g.code).join(" · ") || "—"}</td></tr>)}</tbody></table>
+        <tbody>{db.players.map((p) => <tr key={p.id}><td>{p.name}</td><td>{(p.age_groups || []).map((g: { code?: string }) => g.code).join(" · ") || "—"}</td></tr>)}</tbody></table>
       </div>
     </div>
   );
 }
-function Select({ name, options, labelKey, allowEmpty, placeholder }: any) {
+
+function Select({ name, options, labelKey, allowEmpty, placeholder }: {
+  name: string; options: any[]; labelKey: string; allowEmpty?: boolean; placeholder?: string;
+}) {
   return (
     <select name={name} required={!allowEmpty} defaultValue="">
       <option value="">{placeholder || (allowEmpty ? "—" : "Selecionar")}</option>
-      {options.map((o: any) => <option key={o.id} value={o.id}>{o[labelKey]}</option>)}
+      {options.map((o) => <option key={o.id} value={o.id}>{o[labelKey]}</option>)}
     </select>
   );
 }
-function FormCard({ title, children, onSubmit }: any) {
+
+function FormCard({ title, children, onSubmit }: {
+  title: string; children: React.ReactNode; onSubmit: (fd: Fd) => void | Promise<void>;
+}) {
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const fd: Record<string, string> = {};
+    const fd: Fd = {};
     form.forEach((v, k) => { fd[k] = String(v); });
     onSubmit(fd);
     e.currentTarget.reset();
