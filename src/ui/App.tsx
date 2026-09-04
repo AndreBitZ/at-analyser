@@ -6,9 +6,10 @@ import Regulamento from "./Regulamento";
 import RelatorioPage from "./RelatorioPage";
 import WatchlistPage from "./WatchlistPage";
 import SearchPage from "./SearchPage";
+import ScorecardPage from "./ScorecardPage";
 import { post } from "./adminApi";
 
-type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha" | "ihf" | "relatorio" | "watch" | "search";
+type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha" | "ihf" | "relatorio" | "watch" | "search" | "card";
 
 export default function App() {
   const [root, setRoot] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export default function App() {
           <Btn id="ihf" label="Regulamento IHF" />
           <p className="muted">Scout</p>
           <Btn id="relatorio" label="Relatório adversário" />
+          <Btn id="card" label="Scorecard" />
           <Btn id="watch" label="Watchlist" />
         </nav>
         <button type="button" className="ghost" onClick={backup}>Cópia de segurança</button>
@@ -62,6 +64,7 @@ export default function App() {
         {page === "jogos" && <Jogos />}
         {page === "ficha" && <FichaJogo />}
         {page === "relatorio" && <RelatorioPage />}
+        {page === "card" && <ScorecardPage />}
         {page === "watch" && <WatchlistPage />}
         {page === "ihf" && <Regulamento />}
       </main>
