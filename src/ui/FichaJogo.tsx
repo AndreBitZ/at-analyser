@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { get, patch, post } from "./adminApi";
 import { formatClock } from "../domain/time";
-import { StatsPanel, TimelinePanel } from "./MatchTimeline";
+import { eventsForFilter, StatsPanel, TimelinePanel, type StatFilter } from "./MatchTimeline";
+import { KEY_HELP, TAG_KEYS } from "./tagKeys";
 
 const TYPES = [
   "SHOT", "ASSIST", "PRE_ASSIST", "TURNOVER", "STEAL", "INTERCEPTION", "RECOVERY",
@@ -46,6 +47,7 @@ export default function FichaJogo() {
   const [result, setResult] = useState("GOAL");
   const [notes, setNotes] = useState("");
   const [err, setErr] = useState("");
+  const [filter, setFilter] = useState<StatFilter>(null);
 
   const match = matches.find((m) => m.id === matchId);
   const clock = formatClock(clockSec);
@@ -55,6 +57,20 @@ export default function FichaJogo() {
     const id = window.setInterval(() => setClockSec((s) => s + 1), 1000);
     return () => window.clearInterval(id);
   }, [running]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") return;
+      const mapped = TAG_KEYS[e.key.toLowerCase()];
+      if (mapped) { e.preventDefault(); setType(mapped); }
+      if (e.key === " ") { e.preventDefault(); setRunning((r) => !r); }
+      if (e.key === "h") setTeamId(match?.home_team_id || "");
+      if (e.key === "f") setTeamId(match?.away_team_id || "");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [match]);
 
   async function loadLists() {
     const ms = await get("/matches");
@@ -77,6 +93,7 @@ export default function FichaJogo() {
   useEffect(() => { if (matchId) loadMatch(matchId).catch(() => {}); }, [matchId]);
 
   const roster = useMemo(() => teamId ? squad.filter((s) => s.team_id === teamId) : squad, [squad, teamId]);
+  const shown = useMemo(() => eventsForFilter(events, filter), [events, filter]);
 
   async function addEvent(e: FormEvent) {
     e.preventDefault();
@@ -95,24 +112,20 @@ export default function FichaJogo() {
   async function inOut(row: any, kind: "in" | "out") {
     setErr("");
     try {
-      if (kind === "in") {
-        await post("/stints/in", { match_id: matchId, player_id: row.player_id, team_id: row.team_id, position_played: row.primary_position, timestamp_seconds: clockSec });
-      } else {
-        await post("/stints/out", { match_id: matchId, player_id: row.player_id, timestamp_seconds: clockSec });
-      }
+      if (kind === "in") await post("/stints/in", { match_id: matchId, player_id: row.player_id, team_id: row.team_id, position_played: row.primary_position, timestamp_seconds: clockSec });
+      else await post("/stints/out", { match_id: matchId, player_id: row.player_id, timestamp_seconds: clockSec });
       await loadMatch(matchId, clockSec);
-    } catch (e: any) { setErr(e.message); }
+    } catch (ex: any) { setErr(ex.message); }
   }
 
   const embed = video ? ytId(video) : null;
   const homeOn = state?.onCourtByTeam?.[match?.home_team_id] || 0;
   const awayOn = state?.onCourtByTeam?.[match?.away_team_id] || 0;
-  const hg = state?.gk?.home;
-  const ag = state?.gk?.away;
 
   return (
     <div>
       <h2>Ficha de jogo</h2>
+      <p className="muted">Espaço = play/pausa. H/F = casa/fora. Teclas: {KEY_HELP.map((k) => k.join("=")).join(" · ")}</p>
       <div className="card" style={{ marginBottom: 12 }}>
         <select value={matchId} onChange={(e) => setMatchId(e.target.value)}>
           <option value="">Jogo</option>
@@ -124,29 +137,25 @@ export default function FichaJogo() {
           <div className="card" style={{ marginBottom: 12 }}>
             <h3>Cronómetro</h3>
             <p className="stat">{clock}</p>
-            <p className="muted">{match.home_team_name}: {homeOn} em campo · {hg?.situation?.label || "GR ?"}</p>
-            <p className="muted">{match.away_team_name}: {awayOn} em campo · {ag?.situation?.label || "GR ?"}</p>
-            {state?.passive?.active && <p className="note">Passivo: {state.passive.passes} passes, restam {state.passive.remaining}</p>}
+            <p className="muted">{match.home_team_name}: {homeOn} · {state?.gk?.home?.situation?.label}</p>
+            <p className="muted">{match.away_team_name}: {awayOn} · {state?.gk?.away?.situation?.label}</p>
             <div className="row" style={{ marginTop: 8 }}>
               <button type="button" onClick={() => setRunning(true)}>Play</button>
               <button type="button" onClick={() => setRunning(false)}>Pausa</button>
               <button type="button" onClick={() => { setRunning(false); setClockSec(0); }}>00:00</button>
-              <button type="button" onClick={() => { setRunning(false); setClockSec(1800); }}>2.ª parte 30:00</button>
-              <button type="button" onClick={() => loadMatch(matchId, clockSec)}>Actualizar regras</button>
+              <button type="button" onClick={() => { setRunning(false); setClockSec(1800); }}>30:00</button>
             </div>
             {err && <p className="note">{err}</p>}
           </div>
           <div className="grid">
             <div className="card">
               <h3>Vídeo</h3>
-              <div className="stack">
-                <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL do vídeo" />
-                <button type="button" onClick={() => patch(`/matches/${matchId}`, { video_url: video })}>Guardar ligação</button>
-              </div>
-              {embed ? <iframe title="video" width="100%" height="220" src={`https://www.youtube.com/embed/${embed}`} allowFullScreen /> : video ? <video src={video} controls style={{ width: "100%" }} /> : null}
+              <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL" />
+              <button type="button" onClick={() => patch(`/matches/${matchId}`, { video_url: video })}>Guardar</button>
+              {embed ? <iframe title="v" width="100%" height="200" src={`https://www.youtube.com/embed/${embed}`} allowFullScreen /> : video ? <video src={video} controls style={{ width: "100%" }} /> : null}
             </div>
             <form className="card" onSubmit={addEvent}>
-              <h3>Marcar acção às {clock}</h3>
+              <h3>Marcar às {clock}</h3>
               <div className="stack">
                 <select value={teamId} onChange={(e) => { setTeamId(e.target.value); setPlayerId(""); }} required>
                   <option value="">Equipa</option>
@@ -158,40 +167,14 @@ export default function FichaJogo() {
                   {roster.map((p) => <option key={p.player_id} value={p.player_id}>{p.player_name}</option>)}
                 </select>
                 <select value={type} onChange={(e) => setType(e.target.value)}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-                {type === "SHOT" && (
-                  <>
-                    <select value={z} onChange={(e) => setZ(e.target.value)}>{ZONES.map((x) => <option key={x}>{x}</option>)}</select>
-                    <select value={b} onChange={(e) => setB(e.target.value)}>{BOXES.map((x) => <option key={x}>{x}</option>)}</select>
-                    <select value={result} onChange={(e) => setResult(e.target.value)}>{RESULTS.map((x) => <option key={x}>{x}</option>)}</select>
-                  </>
-                )}
+                {type === "SHOT" && <><select value={z} onChange={(e) => setZ(e.target.value)}>{ZONES.map((x) => <option key={x}>{x}</option>)}</select><select value={b} onChange={(e) => setB(e.target.value)}>{BOXES.map((x) => <option key={x}>{x}</option>)}</select><select value={result} onChange={(e) => setResult(e.target.value)}>{RESULTS.map((x) => <option key={x}>{x}</option>)}</select></>}
                 <button type="submit">Registar</button>
               </div>
             </form>
           </div>
-          <StatsPanel events={events} homeId={match.home_team_id} awayId={match.away_team_id} homeName={match.home_team_name} awayName={match.away_team_name} />
-          <TimelinePanel events={events} stints={stints} players={players} />
-          <div className="card" style={{ marginTop: 12 }}>
-            <h3>Tempo em campo</h3>
-            <table>
-              <thead><tr><th>Atleta</th><th>Min</th><th>Estado</th><th></th></tr></thead>
-              <tbody>
-                {squad.map((row) => {
-                  const live = liveNow(stints, row.player_id, clockSec);
-                  const red = state?.reds?.includes(row.player_id);
-                  const sus = (state?.activeSuspensions || []).find((s: any) => s.player_id === row.player_id);
-                  return (
-                    <tr key={row.player_id}>
-                      <td>{row.player_name} {row.primary_position === "GK" ? "(GR)" : ""}</td>
-                      <td>{minutesOf(stints, row.player_id, clockSec).toFixed(1)}</td>
-                      <td>{red ? "desqualificada" : sus ? "2 min" : live ? "em campo" : "banco"}</td>
-                      <td>{live ? <button type="button" onClick={() => inOut(row, "out")}>Sair</button> : <button type="button" onClick={() => inOut(row, "in")}>Entrar</button>}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <StatsPanel events={events} homeId={match.home_team_id} awayId={match.away_team_id} homeName={match.home_team_name} awayName={match.away_team_name} onPick={setFilter} />
+          {filter && <p className="muted">Filtro activo. <button type="button" onClick={() => setFilter(null)}>Ver tudo</button></p>}
+          <TimelinePanel events={shown} stints={filter ? [] : stints} players={players} hideStints={!!filter} />
         </>
       )}
     </div>
