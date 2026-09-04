@@ -1,69 +1,67 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { load, save, uid, type Store } from "../data/localStore";
-import { clientId, connectDrive, isDriveConnected, pullFromDrive, pushToDrive } from "../data/driveSync";
+import { canUseFolder, getHandle, pickFolder, readFolder, writeFolder } from "../data/folderSync";
 
 export default function ClubAdmin() {
   const [db, setDb] = useState<Store>(() => load());
-  const [drive, setDrive] = useState(isDriveConnected());
+  const [pasta, setPasta] = useState(false);
   const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    getHandle().then((h) => setPasta(Boolean(h)));
+  }, []);
 
   async function commit(next: Store) {
     save(next);
     setDb(next);
-    if (isDriveConnected()) {
+    if (pasta) {
       try {
-        await pushToDrive(next);
-        setMsg("Guardado no Drive");
+        await writeFolder(next);
+        setMsg("Guardado na pasta do PC");
       } catch (e: any) {
         setMsg(e.message);
       }
     }
   }
 
-  async function ligar() {
+  async function escolherPasta() {
     try {
-      setMsg("A pedir autorização Google…");
-      await connectDrive();
-      setDrive(true);
-      const remote = await pullFromDrive();
+      await pickFolder();
+      setPasta(true);
+      const remote = await readFolder();
       if (remote && (remote.clubs?.length || remote.players?.length)) {
-        save(remote as Store);
-        setDb({ ...load(), ...remote });
-        setMsg("Drive ligado. Dados remotos carregados.");
+        const merged = { ...load(), ...remote };
+        save(merged);
+        setDb(merged);
+        setMsg("Pasta ligada. Dados lidos do ficheiro.");
       } else {
-        await pushToDrive(load());
-        setMsg("Drive ligado. Cópia enviada.");
+        await writeFolder(load());
+        setMsg("Pasta ligada. Criado at-analyser-db.json.");
       }
     } catch (e: any) {
-      setMsg(e.message);
+      if (e.name !== "AbortError") setMsg(e.message);
     }
-  }
-
-  function exportJson() {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: "application/json" }));
-    a.download = "at-analyser-db.json";
-    a.click();
   }
 
   return (
     <div>
-      <p className="muted">
-        Cada Guardar grava neste browser. Com o Drive ligado, grava também na cloud.
-      </p>
-      <div className="row">
-        <button type="button" onClick={ligar} disabled={!clientId() && false}>
-          {drive ? "Drive ligado" : "Ligar Google Drive"}
-        </button>
-        <button type="button" onClick={exportJson}>Exportar JSON</button>
-      </div>
-      {!clientId() && (
-        <p className="note">
-          Falta o Client ID. Segue o guia docs/DRIVE.md (console.cloud.google.com) e põe VITE_GOOGLE_CLIENT_ID no .env.
+      <div className="card">
+        <h3>Definições — pasta no PC</h3>
+        <p className="muted">
+          No Chrome ou Edge, escolhe uma pasta (por exemplo Documentos/AT Analyser). A app lê e grava
+          o ficheiro at-analyser-db.json nessa pasta. No telemóvel isto não existe.
         </p>
-      )}
-      {msg && <p className="muted">{msg}</p>}
-      <div className="grid">
+        {canUseFolder() ? (
+          <button type="button" onClick={escolherPasta}>
+            {pasta ? "Mudar pasta" : "Escolher pasta do PC"}
+          </button>
+        ) : (
+          <p className="note">Abre a app no Chrome ou Edge do computador para escolher a pasta.</p>
+        )}
+        {msg && <p className="muted">{msg}</p>}
+      </div>
+
+      <div className="grid" style={{ marginTop: 16 }}>
         <FormCard title="Clube" onSubmit={(fd) => commit({ ...db, clubs: [...db.clubs, { id: uid("club"), name: fd.name, city: fd.city }] })}>
           <input name="name" placeholder="Nome do clube" required />
           <input name="city" placeholder="Cidade" />
