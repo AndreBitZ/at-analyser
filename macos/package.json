@@ -26,6 +26,6 @@
       "identity": null,
       "hardenedRuntime": true
     },
-    "files": ["main.mjs", "preload.cjs"]
+    "files": ["main.mjs", "preload.cjs", "prefs.mjs"]
   }
 }
