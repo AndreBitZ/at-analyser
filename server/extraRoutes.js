@@ -1,7 +1,9 @@
 import { id, row, rows } from "./db.js";
+import { historyRoutes } from "./historyRoutes.js";
 
 export async function extraRoutes(db, req, res, path, method, parts, json, send) {
   if (!db) return false;
+  if (await historyRoutes(db, res, path, method, parts, send)) return true;
 
   if (method === "GET" && path === "/stats") {
     const one = async (sql) => Number((await db.execute(sql)).rows[0]?.n || 0);
