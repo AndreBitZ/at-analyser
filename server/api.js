@@ -4,6 +4,7 @@ import { id, row, rows } from "./db.js";
 import { getWorkspace, openWorkspace, mediaPath } from "./workspace.js";
 import { armTimer, runBackup, saveSettings, status } from "./backup.js";
 import { extraRoutes } from "./extraRoutes.js";
+import { pickFolder } from "./pickFolder.js";
 
 async function json(req) {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
@@ -35,6 +36,10 @@ export async function handleApi(db, req, res) {
       send(res, 200, { ok: true, mode: "local-sqlite", ready: ws.ready, root: ws.root }); return;
     }
     if (method === "GET" && path === "/workspace") { send(res, 200, getWorkspace()); return; }
+    if (method === "POST" && path === "/workspace/browse") {
+      const root = await pickFolder();
+      send(res, 200, { root: root || null }); return;
+    }
     if (method === "POST" && path === "/workspace") {
       const b = await json(req);
       const opened = await openWorkspace(b.root);
