@@ -1,4 +1,7 @@
+import { writeFileSync } from "node:fs";
+import { extname } from "node:path";
 import { id, row, rows } from "./db.js";
+import { getWorkspace, openWorkspace, mediaPath } from "./workspace.js";
 
 async function json(req) {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
@@ -27,8 +30,30 @@ export async function handleApi(db, req, res) {
   const parts = path.split("/").filter(Boolean);
   try {
     if (method === "GET" && path === "/health") {
-      send(res, 200, { ok: true, mode: process.env.TURSO_DATABASE_URL ? "turso" : "local-sqlite" });
+      const ws = getWorkspace();
+      send(res, 200, { ok: true, mode: "local-sqlite", ready: ws.ready, root: ws.root });
       return;
+    }
+    if (method === "GET" && path === "/workspace") {
+      send(res, 200, getWorkspace()); return;
+    }
+    if (method === "POST" && path === "/workspace") {
+      const b = await json(req);
+      const opened = await openWorkspace(b.root);
+      send(res, 200, opened); return;
+    }
+    if (method === "POST" && path === "/media") {
+      if (!getWorkspace().ready) { send(res, 409, { error: "Escolhe a pasta de dados primeiro" }); return; }
+      const b = await json(req);
+      const folder = String(b.folder || "logos").replace(/\.\./g, "");
+      const filename = String(b.filename || `ficheiro${Date.now()}`).replace(/[/\\]/g, "_");
+      const buf = Buffer.from(b.base64 || "", "base64");
+      const dest = mediaPath(folder, filename);
+      writeFileSync(dest, buf);
+      send(res, 201, { path: `${folder}/${filename}`, ext: extname(filename) }); return;
+    }
+    if (!db) {
+      send(res, 409, { error: "Escolhe a pasta de dados no ecrã inicial." }); return;
     }
     if (method === "GET" && path === "/export") {
       const dump = {};
