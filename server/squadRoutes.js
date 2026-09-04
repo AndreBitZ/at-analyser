@@ -1,4 +1,5 @@
 import { id, rows } from "./db.js";
+import { matchState } from "./rules.js";
 
 export async function squadRoutes(db, req, res, path, method, parts, json, send) {
   const url = new URL(req.url, "http://local");
@@ -45,10 +46,14 @@ export async function squadRoutes(db, req, res, path, method, parts, json, send)
 
   if (method === "POST" && path === "/stints/in") {
     const b = await json(req);
+    const ts = Number(b.timestamp_seconds || 0);
+    const state = await matchState(db, b.match_id, ts);
+    const gate = state.canEnter(b.player_id, b.team_id);
+    if (!gate.ok) { send(res, 400, { error: gate.reason }); return true; }
     const sid = id("st");
     await db.execute({
       sql: "INSERT INTO stints (id, match_id, player_id, team_id, position_played, start_timestamp, end_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      args: [sid, b.match_id, b.player_id, b.team_id, b.position_played || "UNKNOWN", Number(b.timestamp_seconds || 0), 99999],
+      args: [sid, b.match_id, b.player_id, b.team_id, b.position_played || "UNKNOWN", ts, 99999],
     });
     send(res, 201, { id: sid });
     return true;
