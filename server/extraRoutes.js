@@ -2,12 +2,14 @@ import { id, row, rows } from "./db.js";
 import { historyRoutes } from "./historyRoutes.js";
 import { eventsRoutes } from "./eventsRoutes.js";
 import { squadRoutes } from "./squadRoutes.js";
+import { scoutRoutes } from "./scoutRoutes.js";
 
 export async function extraRoutes(db, req, res, path, method, parts, json, send) {
   if (!db) return false;
   if (await historyRoutes(db, res, path, method, parts, send)) return true;
   if (await eventsRoutes(db, req, res, path, method, parts, json, send)) return true;
   if (await squadRoutes(db, req, res, path, method, parts, json, send)) return true;
+  if (await scoutRoutes(db, req, res, path, method, parts, json, send)) return true;
 
   if (method === "GET" && path === "/stats") {
     const one = async (sql) => Number((await db.execute(sql)).rows[0]?.n || 0);
