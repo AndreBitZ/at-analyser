@@ -1,12 +1,13 @@
 {
   "name": "at-analyser",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "server": "node server/index.js",
     "start": "node scripts/start.mjs",
+    "mac": "npm --prefix macos install && npm --prefix macos start",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run"
