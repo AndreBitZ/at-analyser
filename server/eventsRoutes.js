@@ -43,6 +43,9 @@ export async function eventsRoutes(db, req, res, path, method, parts, json, send
       numerical_context: b.numerical_context || "EVEN_6V6",
       passive_context: b.passive_context || "NO_PASSIVE",
       score_difference_before: Number(b.score_difference_before || 0),
+      attack_type: b.attack_type || null,
+      defense_system: b.defense_system || null,
+      possession_phase: b.possession_phase || null,
     });
     const shot = b.shot_json || (b.field_shot_zone ? JSON.stringify({
       field_shot_zone: b.field_shot_zone,
