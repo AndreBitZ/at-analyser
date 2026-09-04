@@ -3,8 +3,10 @@ import WorkspaceGate from "./WorkspaceGate";
 import { Atletas, Campeonatos, Clubes, Epocas, Geral, Jogos } from "./Pages";
 import FichaJogo from "./FichaJogo";
 import Regulamento from "./Regulamento";
+import RelatorioPage from "./RelatorioPage";
+import WatchlistPage from "./WatchlistPage";
 
-type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha" | "ihf";
+type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha" | "ihf" | "relatorio" | "watch";
 
 const MENU: { id: Page; label: string }[] = [
   { id: "geral", label: "Geral" },
@@ -14,6 +16,8 @@ const MENU: { id: Page; label: string }[] = [
   { id: "atletas", label: "Atletas" },
   { id: "jogos", label: "Jogos" },
   { id: "ficha", label: "Ficha de jogo" },
+  { id: "relatorio", label: "Relatório adversário" },
+  { id: "watch", label: "Watchlist" },
   { id: "ihf", label: "Regulamento IHF" },
 ];
 
@@ -43,6 +47,8 @@ export default function App() {
         {page === "atletas" && <Atletas />}
         {page === "jogos" && <Jogos />}
         {page === "ficha" && <FichaJogo />}
+        {page === "relatorio" && <RelatorioPage />}
+        {page === "watch" && <WatchlistPage />}
         {page === "ihf" && <Regulamento />}
       </main>
     </div>
