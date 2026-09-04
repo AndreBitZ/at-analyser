@@ -1,12 +1,21 @@
 import { FormEvent, useEffect, useState } from "react";
 import { get, post, patch } from "./adminApi";
 import BackupPanel from "./BackupPanel";
+import { BarList, Donut } from "./Charts";
 
 type Fd = Record<string, string>;
 
+function norm(rows: any[] | undefined) {
+  return (rows || []).map((r) => ({ label: String(r.label || "—"), value: Number(r.value || 0) }));
+}
+
 export function Geral() {
   const [s, setS] = useState<any>(null);
-  useEffect(() => { get("/stats").then(setS).catch(() => setS({})); }, []);
+  const [d, setD] = useState<any>(null);
+  useEffect(() => {
+    get("/stats").then(setS).catch(() => setS({}));
+    get("/dashboard").then(setD).catch(() => setD({}));
+  }, []);
   if (!s) return <p className="muted">A carregar…</p>;
   const items = [
     ["Clubes", s.clubs], ["Escalões", s.age_groups], ["Épocas", s.seasons],
@@ -16,11 +25,19 @@ export function Geral() {
   return (
     <div>
       <h2>Geral</h2>
-      <p className="muted">Totais na pasta de dados aberta.</p>
+      <p className="muted">Totais e gráficos da pasta de dados aberta.</p>
       <div className="grid">
         {items.map(([k, v]) => (
           <div className="card" key={String(k)}><h3>{k}</h3><div className="stat">{v ?? 0}</div></div>
         ))}
+      </div>
+      <div className="grid" style={{ marginTop: 16 }}>
+        <Donut title="Atletas por posição" data={norm(d?.positions)} />
+        <BarList title="Atletas por clube" data={norm(d?.playersByClub)} />
+        <BarList title="Equipas por clube" data={norm(d?.teamsByClub)} />
+        <BarList title="Plantel activo por equipa" data={norm(d?.rosterByTeam)} />
+        <BarList title="Jogos por campeonato" data={norm(d?.matchesByChamp)} />
+        <BarList title="Jogos por época" data={norm(d?.matchesBySeason)} />
       </div>
       <div style={{ marginTop: 16 }}><BackupPanel /></div>
     </div>
@@ -36,8 +53,7 @@ export function Epocas() {
     <div>
       <h2>Época</h2>
       <Form title={edit ? "Editar época" : "Nova época"} onSubmit={async (fd) => {
-        if (edit) await patch(`/seasons/${edit.id}`, fd);
-        else await post("/seasons", fd);
+        if (edit) await patch(`/seasons/${edit.id}`, fd); else await post("/seasons", fd);
         setEdit(null); await load();
       }}>
         <input name="label" placeholder="2025/26" defaultValue={edit?.label || ""} required />
@@ -55,19 +71,13 @@ export function Campeonatos() {
   const [seasons, setSeasons] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
-  const load = async () => {
-    setRows(await get("/championships"));
-    setSeasons(await get("/seasons"));
-    setTeams(await get("/teams"));
-  };
+  const load = async () => { setRows(await get("/championships")); setSeasons(await get("/seasons")); setTeams(await get("/teams")); };
   useEffect(() => { load(); }, []);
   return (
     <div>
       <h2>Campeonato</h2>
-      <p className="muted">Cada campeonato pertence a uma época. Depois inscreves equipas.</p>
       <Form title={edit ? "Editar campeonato" : "Novo campeonato"} onSubmit={async (fd) => {
-        if (edit) await patch(`/championships/${edit.id}`, fd);
-        else await post("/championships", fd);
+        if (edit) await patch(`/championships/${edit.id}`, fd); else await post("/championships", fd);
         setEdit(null); await load();
       }}>
         <Select name="season_id" options={seasons} labelKey="label" defaultValue={edit?.season_id} />
@@ -89,11 +99,7 @@ export function Clubes() {
   const [groups, setGroups] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
-  const load = async () => {
-    setClubs(await get("/clubs"));
-    setGroups(await get("/age-groups"));
-    setTeams(await get("/teams"));
-  };
+  const load = async () => { setClubs(await get("/clubs")); setGroups(await get("/age-groups")); setTeams(await get("/teams")); };
   useEffect(() => { load(); }, []);
   return (
     <div>
@@ -134,19 +140,13 @@ export function Atletas() {
   const [transfers, setTransfers] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
   const load = async () => {
-    setPlayers(await get("/players"));
-    setClubs(await get("/clubs"));
-    setGroups(await get("/age-groups"));
-    setTeams(await get("/teams"));
-    setSeasons(await get("/seasons"));
-    setRosters(await get("/rosters"));
-    setTransfers(await get("/transfers"));
+    setPlayers(await get("/players")); setClubs(await get("/clubs")); setGroups(await get("/age-groups"));
+    setTeams(await get("/teams")); setSeasons(await get("/seasons")); setRosters(await get("/rosters")); setTransfers(await get("/transfers"));
   };
   useEffect(() => { load(); }, []);
   return (
     <div>
       <h2>Atletas</h2>
-      <p className="muted">O atleta mantém o mesmo registo. Transferir muda de equipa e guarda o histórico.</p>
       <Form title={edit ? "Editar atleta" : "Novo atleta"} onSubmit={async (fd) => {
         if (edit) await patch(`/players/${edit.id}`, fd);
         else await post("/players", { ...fd, age_group_ids: [fd.age_group_id, fd.age_group_id_2].filter(Boolean), is_goalkeeper: fd.primary_position === "GK" });
@@ -159,7 +159,7 @@ export function Atletas() {
         <Select name="age_group_id" options={groups} labelKey="name" allowEmpty />
         <Select name="age_group_id_2" options={groups} labelKey="name" allowEmpty placeholder="2.º escalão" />
       </Form>
-      <Form title="Associar a uma equipa (epoca)" onSubmit={async (fd) => { await post("/rosters", fd); await load(); }}>
+      <Form title="Associar a uma equipa" onSubmit={async (fd) => { await post("/rosters", fd); await load(); }}>
         <Select name="player_id" options={players} labelKey="name" />
         <Select name="team_id" options={teams} labelKey="name" />
         <Select name="season_id" options={seasons} labelKey="label" />
@@ -170,14 +170,11 @@ export function Atletas() {
         <Select name="to_team_id" options={teams} labelKey="name" />
         <Select name="season_id" options={seasons} labelKey="label" />
       </Form>
-      <table><thead><tr><th>Nome</th><th>Nº</th><th>Pos.</th><th>Escalões</th><th></th></tr></thead>
-        <tbody>{players.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.shirt_number ?? "—"}</td><td>{p.primary_position}</td><td>{(p.age_groups || []).map((g: any) => g.code).join(" · ")}</td><td><button type="button" onClick={() => setEdit(p)}>Editar</button></td></tr>)}</tbody></table>
+      <table><thead><tr><th>Nome</th><th>Nº</th><th>Pos.</th><th></th></tr></thead>
+        <tbody>{players.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.shirt_number ?? "—"}</td><td>{p.primary_position}</td><td><button type="button" onClick={() => setEdit(p)}>Editar</button></td></tr>)}</tbody></table>
       <h3>Plantel</h3>
       <table><thead><tr><th>Atleta</th><th>Equipa</th><th>Época</th><th>Saiu</th></tr></thead>
         <tbody>{rosters.map((r, i) => <tr key={i}><td>{r.player_name}</td><td>{r.team_name}</td><td>{r.season_label}</td><td>{r.left_at || "activa"}</td></tr>)}</tbody></table>
-      <h3>Transferências</h3>
-      <table><thead><tr><th>Atleta</th><th>De</th><th>Para</th><th>Época</th></tr></thead>
-        <tbody>{transfers.map((t) => <tr key={t.id}><td>{t.player_name}</td><td>{t.from_team_name || "—"}</td><td>{t.to_team_name}</td><td>{t.season_label}</td></tr>)}</tbody></table>
     </div>
   );
 }
@@ -188,19 +185,13 @@ export function Jogos() {
   const [teams, setTeams] = useState<any[]>([]);
   const [seasons, setSeasons] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
-  const load = async () => {
-    setRows(await get("/matches"));
-    setChamps(await get("/championships"));
-    setTeams(await get("/teams"));
-    setSeasons(await get("/seasons"));
-  };
+  const load = async () => { setRows(await get("/matches")); setChamps(await get("/championships")); setTeams(await get("/teams")); setSeasons(await get("/seasons")); };
   useEffect(() => { load(); }, []);
   return (
     <div>
       <h2>Jogos</h2>
       <Form title={edit ? "Editar jogo" : "Novo jogo"} onSubmit={async (fd) => {
-        if (edit) await patch(`/matches/${edit.id}`, fd);
-        else await post("/matches", fd);
+        if (edit) await patch(`/matches/${edit.id}`, fd); else await post("/matches", fd);
         setEdit(null); await load();
       }}>
         <Select name="season_id" options={seasons} labelKey="label" allowEmpty />
