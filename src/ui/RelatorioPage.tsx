@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { get } from "./adminApi";
+import { BoxHeat, ZoneHeat } from "./HeatMap";
 
 function briefing(name: string, r: any) {
   const topZ = Object.entries(r.zones || {}).sort((a: any, b: any) => b[1] - a[1])[0];
   const topB = Object.entries(r.boxes || {}).sort((a: any, b: any) => b[1] - a[1])[0];
   const sys = Object.entries(r.systems || {}).sort((a: any, b: any) => b[1] - a[1])[0];
+  const att = Object.entries(r.attacks || {}).sort((a: any, b: any) => b[1] - a[1])[0];
   const fiab = r.shots >= 40 ? "boa" : r.shots >= 15 ? "média" : "baixa";
-  return `Em ${r.matches} jogo(s) analisado(s), ${name} rematou ${r.shots} vezes com ${r.pct}% de eficácia (${r.goals} golos). ` +
-    (topZ ? `Maior volume de remate em ${topZ[0]} (${topZ[1]}). ` : "") +
-    (topB ? `Destino mais usado na baliza ${topB[0]}. ` : "") +
-    (sys ? `Sistema defensivo mais marcado: ${sys[0]}. ` : "Sistema defensivo ainda pouco etiquetado. ") +
-    `Golos nos últimos 10 min: ${r.crunchGoals}. Acções em 7×6: ${r.seven6}. Perdas: ${r.turnovers}. 2 min: ${r.twoMin}. ` +
-    `A leitura tem fiabilidade ${fiab}, com base em ${r.shots} remates — confirmar nos clips.`;
+  return `Em ${r.matches} jogo(s), ${name} rematou ${r.shots} vezes com ${r.pct}% de eficácia. ` +
+    (topZ ? `Maior volume em ${topZ[0]}. ` : "") +
+    (topB ? `Baliza ${topB[0]}. ` : "") +
+    (att ? `Ataque mais marcado: ${att[0]}. ` : "") +
+    (sys ? `Defesa mais marcada: ${sys[0]}. ` : "") +
+    `Crunch: ${r.crunchGoals} golos. 7×6: ${r.seven6}. Fiabilidade ${fiab}.`;
 }
 
 export default function RelatorioPage() {
@@ -28,7 +30,6 @@ export default function RelatorioPage() {
   return (
     <div>
       <h2>Relatório de adversário</h2>
-      <p className="muted">Uma página para o treinador. Imprime / PDF com Ctrl+P.</p>
       <div className="card" style={{ marginBottom: 12 }}>
         <select value={teamId} onChange={(e) => load(e.target.value)}>
           <option value="">Equipa</option>
@@ -43,14 +44,12 @@ export default function RelatorioPage() {
             <div><div className="muted">Remates</div><div className="stat">{rep.shots}</div></div>
             <div><div className="muted">Golos</div><div className="stat">{rep.goals}</div></div>
             <div><div className="muted">Eficácia</div><div className="stat">{rep.pct}%</div></div>
-            <div><div className="muted">Crunch 10 min</div><div className="stat">{rep.crunchGoals}</div></div>
-            <div><div className="muted">7×6</div><div className="stat">{rep.seven6}</div></div>
-            <div><div className="muted">2 min</div><div className="stat">{rep.twoMin}</div></div>
+            <div><div className="muted">Crunch</div><div className="stat">{rep.crunchGoals}</div></div>
           </div>
-          <h3>Zonas Z</h3>
-          <p>{Object.keys(rep.zones).length ? Object.entries(rep.zones).map(([k, v]) => `${k}:${v}`).join(" · ") : "—"}</p>
-          <h3>Baliza B</h3>
-          <p>{Object.keys(rep.boxes).length ? Object.entries(rep.boxes).map(([k, v]) => `${k}:${v}`).join(" · ") : "—"}</p>
+          <p className="muted">Ataques: {Object.entries(rep.attacks || {}).map(([k, v]) => `${k}:${v}`).join(" · ") || "—"}</p>
+          <p className="muted">Sistemas: {Object.entries(rep.systems || {}).map(([k, v]) => `${k}:${v}`).join(" · ") || "—"}</p>
+          <ZoneHeat zones={rep.zones} />
+          <BoxHeat boxes={rep.boxes} />
           <button type="button" onClick={() => window.print()}>Imprimir / PDF</button>
         </div>
       )}
