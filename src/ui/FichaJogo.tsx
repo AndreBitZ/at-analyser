@@ -9,7 +9,7 @@ const TYPES = [
   "SHOT", "ASSIST", "PRE_ASSIST", "TURNOVER", "STEAL", "INTERCEPTION", "RECOVERY",
   "DEFENSIVE_BLOCK", "SEVEN_METER_WON", "TWO_MIN_RECEIVED", "TWO_MIN_DRAWN",
   "YELLOW_CARD", "RED_CARD", "BLUE_CARD", "GOALKEEPER_SAVE",
-  "PASSIVE_WARNING", "PASS", "PASSIVE_TURNOVER",
+  "PASSIVE_WARNING", "PASS", "PASSIVE_TURNOVER", "POSSESSION_START", "POSSESSION_END",
 ];
 const ZONES = ["Z1","Z2","Z3","Z4","Z5","Z6","Z7","Z8","Z9"];
 const BOXES = ["B1","B2","B3","B4","B5","B6","B7","B8","B9"];
@@ -40,6 +40,8 @@ export default function FichaJogo() {
   const [notes, setNotes] = useState("");
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState<StatFilter>(null);
+  const [attackType, setAttackType] = useState("POSITIONAL");
+  const [defenseSystem, setDefenseSystem] = useState("6-0");
 
   const match = matches.find((m) => m.id === matchId);
   const clock = formatClock(clockSec);
@@ -67,7 +69,11 @@ export default function FichaJogo() {
       match_id: matchId, timestamp_seconds: clockSec, team_id: teamId, player_id: playerId || null, type,
       field_shot_zone: type === "SHOT" ? z : undefined,
       goal_target_zone: type === "SHOT" ? b : undefined,
-      shot_result: type === "SHOT" ? result : undefined, notes,
+      shot_result: type === "SHOT" ? result : undefined,
+      attack_type: attackType,
+      defense_system: defenseSystem,
+      possession_phase: type === "POSSESSION_START" ? "START" : type === "POSSESSION_END" ? "END" : null,
+      notes,
     });
     setNotes("");
     await loadMatch(matchId);
@@ -95,22 +101,20 @@ export default function FichaJogo() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [match, matchId, teamId, playerId, type, clockSec, z, b, result]);
+  }, [match, matchId, teamId, playerId, type, clockSec, z, b, result, attackType, defenseSystem]);
 
   useEffect(() => { get("/matches").then((ms) => { setMatches(ms); if (!matchId && ms[0]) setMatchId(ms[0].id); }).catch(() => {}); get("/players").then(setPlayers).catch(() => {}); }, []);
   useEffect(() => { if (matchId) loadMatch(matchId).catch(() => {}); }, [matchId]);
 
   const roster = useMemo(() => teamId ? squad.filter((s) => s.team_id === teamId) : squad, [squad, teamId]);
   const shown = useMemo(() => eventsForFilter(events, filter), [events, filter]);
-
   async function addEvent(e: FormEvent) { e.preventDefault(); await saveEvent(); }
-
   const embed = video ? ytId(video) : null;
 
   return (
     <div>
       <h2>Ficha de jogo</h2>
-      <p className="muted">Espaço play · Enter regista · Ctrl+Z anula · ←→ ±2s · {KEY_HELP.map((k) => k[0]).join(" ")}</p>
+      <p className="muted">Espaço play · Enter regista · Ctrl+Z anula · {KEY_HELP.map((k) => k[0]).join(" ")}</p>
       <div className="card" style={{ marginBottom: 12 }}>
         <select value={matchId} onChange={(e) => setMatchId(e.target.value)}>
           <option value="">Jogo</option>
@@ -122,6 +126,7 @@ export default function FichaJogo() {
           <div className="card" style={{ marginBottom: 12 }}>
             <h3>Cronómetro {clock}</h3>
             <p className="muted">{match.home_team_name} {state?.gk?.home?.situation?.label} · {match.away_team_name} {state?.gk?.away?.situation?.label}</p>
+            <p className="muted">Ataque {attackType} · Defesa {defenseSystem}</p>
             <button type="button" onClick={() => setRunning((r) => !r)}>{running ? "Pausa" : "Play"}</button>
             <button type="button" onClick={undo}>Anular último</button>
             {playerId && <button type="button" onClick={() => post("/watchlist", { player_id: playerId, status: "SEGUIR" })}>Watchlist</button>}
@@ -130,11 +135,11 @@ export default function FichaJogo() {
           <div className="grid">
             <div className="card">
               <h3>Vídeo</h3>
-              <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL ou videos/ficheiro" />
+              <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL" />
               <button type="button" onClick={() => patch(`/matches/${matchId}`, { video_url: video })}>Guardar</button>
               {embed ? <iframe title="v" width="100%" height="200" src={`https://www.youtube.com/embed/${embed}?start=${clockSec}`} allowFullScreen /> : video ? <video src={video} controls style={{ width: "100%" }} /> : null}
             </div>
-            <TagBoard squad={squad} teamId={teamId} playerId={playerId} type={type} onTeam={setTeamId} onPlayer={setPlayerId} onType={setType} onSubmit={saveEvent} />
+            <TagBoard squad={squad} teamId={teamId} playerId={playerId} type={type} attackType={attackType} defenseSystem={defenseSystem} onTeam={setTeamId} onPlayer={setPlayerId} onType={setType} onAttack={setAttackType} onDefense={setDefenseSystem} onSubmit={saveEvent} />
             <form className="card" onSubmit={addEvent}>
               <h3>Detalhe</h3>
               <div className="stack">
