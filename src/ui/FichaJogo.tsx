@@ -3,6 +3,7 @@ import { get, patch, post } from "./adminApi";
 import { formatClock } from "../domain/time";
 import { eventsForFilter, StatsPanel, TimelinePanel, type StatFilter } from "./MatchTimeline";
 import { KEY_HELP, TAG_KEYS } from "./tagKeys";
+import TagBoard from "./TagBoard";
 
 const TYPES = [
   "SHOT", "ASSIST", "PRE_ASSIST", "TURNOVER", "STEAL", "INTERCEPTION", "RECOVERY",
@@ -17,15 +18,6 @@ const RESULTS = ["GOAL", "SAVED", "MISSED", "POST", "BLOCKED"];
 function ytId(url: string) {
   const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
   return m?.[1] || null;
-}
-function minutesOf(stints: any[], playerId: string, now: number) {
-  return stints.filter((s) => s.player_id === playerId).reduce((acc, s) => {
-    const end = s.end_timestamp >= 99999 ? now : s.end_timestamp;
-    return acc + Math.max(0, end - s.start_timestamp);
-  }, 0) / 60;
-}
-function liveNow(stints: any[], playerId: string, t: number) {
-  return stints.some((s) => s.player_id === playerId && s.start_timestamp <= t && s.end_timestamp > t);
 }
 
 export default function FichaJogo() {
@@ -58,26 +50,6 @@ export default function FichaJogo() {
     return () => window.clearInterval(id);
   }, [running]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const el = e.target as HTMLElement;
-      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") return;
-      const mapped = TAG_KEYS[e.key.toLowerCase()];
-      if (mapped) { e.preventDefault(); setType(mapped); }
-      if (e.key === " ") { e.preventDefault(); setRunning((r) => !r); }
-      if (e.key === "h") setTeamId(match?.home_team_id || "");
-      if (e.key === "f") setTeamId(match?.away_team_id || "");
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [match]);
-
-  async function loadLists() {
-    const ms = await get("/matches");
-    const ps = await get("/players");
-    setMatches(ms); setPlayers(ps);
-    if (!matchId && ms[0]) setMatchId(ms[0].id);
-  }
   async function loadMatch(id: string, t = clockSec) {
     if (!id) return;
     const [ev, sq, st, ms, stt] = await Promise.all([
@@ -89,16 +61,8 @@ export default function FichaJogo() {
     if (m?.video_url) setVideo(m.video_url);
   }
 
-  useEffect(() => { loadLists().catch(() => {}); }, []);
-  useEffect(() => { if (matchId) loadMatch(matchId).catch(() => {}); }, [matchId]);
-
-  const roster = useMemo(() => teamId ? squad.filter((s) => s.team_id === teamId) : squad, [squad, teamId]);
-  const shown = useMemo(() => eventsForFilter(events, filter), [events, filter]);
-
-  async function addEvent(e: FormEvent) {
-    e.preventDefault();
+  async function saveEvent() {
     if (!matchId || !teamId) return;
-    setErr("");
     await post("/events", {
       match_id: matchId, timestamp_seconds: clockSec, team_id: teamId, player_id: playerId || null, type,
       field_shot_zone: type === "SHOT" ? z : undefined,
@@ -109,23 +73,44 @@ export default function FichaJogo() {
     await loadMatch(matchId);
   }
 
-  async function inOut(row: any, kind: "in" | "out") {
-    setErr("");
-    try {
-      if (kind === "in") await post("/stints/in", { match_id: matchId, player_id: row.player_id, team_id: row.team_id, position_played: row.primary_position, timestamp_seconds: clockSec });
-      else await post("/stints/out", { match_id: matchId, player_id: row.player_id, timestamp_seconds: clockSec });
-      await loadMatch(matchId, clockSec);
-    } catch (ex: any) { setErr(ex.message); }
+  async function undo() {
+    if (!matchId) return;
+    try { await post("/events/undo", { match_id: matchId }); await loadMatch(matchId); }
+    catch (e: any) { setErr(e.message); }
   }
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") return;
+      const mapped = TAG_KEYS[e.key.toLowerCase()];
+      if (mapped) { e.preventDefault(); setType(mapped); }
+      if (e.key === " ") { e.preventDefault(); setRunning((r) => !r); }
+      if (e.key === "Enter") { e.preventDefault(); saveEvent(); }
+      if (e.key === "z" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undo(); }
+      if (e.key === "ArrowLeft") setClockSec((s) => Math.max(0, s - 2));
+      if (e.key === "ArrowRight") setClockSec((s) => s + 2);
+      if (e.key === "h") setTeamId(match?.home_team_id || "");
+      if (e.key === "f") setTeamId(match?.away_team_id || "");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [match, matchId, teamId, playerId, type, clockSec, z, b, result]);
+
+  useEffect(() => { get("/matches").then((ms) => { setMatches(ms); if (!matchId && ms[0]) setMatchId(ms[0].id); }).catch(() => {}); get("/players").then(setPlayers).catch(() => {}); }, []);
+  useEffect(() => { if (matchId) loadMatch(matchId).catch(() => {}); }, [matchId]);
+
+  const roster = useMemo(() => teamId ? squad.filter((s) => s.team_id === teamId) : squad, [squad, teamId]);
+  const shown = useMemo(() => eventsForFilter(events, filter), [events, filter]);
+
+  async function addEvent(e: FormEvent) { e.preventDefault(); await saveEvent(); }
+
   const embed = video ? ytId(video) : null;
-  const homeOn = state?.onCourtByTeam?.[match?.home_team_id] || 0;
-  const awayOn = state?.onCourtByTeam?.[match?.away_team_id] || 0;
 
   return (
     <div>
       <h2>Ficha de jogo</h2>
-      <p className="muted">Espaço = play/pausa. H/F = casa/fora. Teclas: {KEY_HELP.map((k) => k.join("=")).join(" · ")}</p>
+      <p className="muted">Espaço play · Enter regista · Ctrl+Z anula · ←→ ±2s · {KEY_HELP.map((k) => k[0]).join(" ")}</p>
       <div className="card" style={{ marginBottom: 12 }}>
         <select value={matchId} onChange={(e) => setMatchId(e.target.value)}>
           <option value="">Jogo</option>
@@ -135,45 +120,33 @@ export default function FichaJogo() {
       {match && (
         <>
           <div className="card" style={{ marginBottom: 12 }}>
-            <h3>Cronómetro</h3>
-            <p className="stat">{clock}</p>
-            <p className="muted">{match.home_team_name}: {homeOn} · {state?.gk?.home?.situation?.label}</p>
-            <p className="muted">{match.away_team_name}: {awayOn} · {state?.gk?.away?.situation?.label}</p>
-            <div className="row" style={{ marginTop: 8 }}>
-              <button type="button" onClick={() => setRunning(true)}>Play</button>
-              <button type="button" onClick={() => setRunning(false)}>Pausa</button>
-              <button type="button" onClick={() => { setRunning(false); setClockSec(0); }}>00:00</button>
-              <button type="button" onClick={() => { setRunning(false); setClockSec(1800); }}>30:00</button>
-            </div>
+            <h3>Cronómetro {clock}</h3>
+            <p className="muted">{match.home_team_name} {state?.gk?.home?.situation?.label} · {match.away_team_name} {state?.gk?.away?.situation?.label}</p>
+            <button type="button" onClick={() => setRunning((r) => !r)}>{running ? "Pausa" : "Play"}</button>
+            <button type="button" onClick={undo}>Anular último</button>
+            {playerId && <button type="button" onClick={() => post("/watchlist", { player_id: playerId, status: "SEGUIR" })}>Watchlist</button>}
             {err && <p className="note">{err}</p>}
           </div>
           <div className="grid">
             <div className="card">
               <h3>Vídeo</h3>
-              <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL" />
+              <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL ou videos/ficheiro" />
               <button type="button" onClick={() => patch(`/matches/${matchId}`, { video_url: video })}>Guardar</button>
-              {embed ? <iframe title="v" width="100%" height="200" src={`https://www.youtube.com/embed/${embed}`} allowFullScreen /> : video ? <video src={video} controls style={{ width: "100%" }} /> : null}
+              {embed ? <iframe title="v" width="100%" height="200" src={`https://www.youtube.com/embed/${embed}?start=${clockSec}`} allowFullScreen /> : video ? <video src={video} controls style={{ width: "100%" }} /> : null}
             </div>
+            <TagBoard squad={squad} teamId={teamId} playerId={playerId} type={type} onTeam={setTeamId} onPlayer={setPlayerId} onType={setType} onSubmit={saveEvent} />
             <form className="card" onSubmit={addEvent}>
-              <h3>Marcar às {clock}</h3>
+              <h3>Detalhe</h3>
               <div className="stack">
-                <select value={teamId} onChange={(e) => { setTeamId(e.target.value); setPlayerId(""); }} required>
-                  <option value="">Equipa</option>
-                  <option value={match.home_team_id}>{match.home_team_name}</option>
-                  <option value={match.away_team_id}>{match.away_team_name}</option>
-                </select>
-                <select value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
-                  <option value="">Atleta</option>
-                  {roster.map((p) => <option key={p.player_id} value={p.player_id}>{p.player_name}</option>)}
-                </select>
                 <select value={type} onChange={(e) => setType(e.target.value)}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
                 {type === "SHOT" && <><select value={z} onChange={(e) => setZ(e.target.value)}>{ZONES.map((x) => <option key={x}>{x}</option>)}</select><select value={b} onChange={(e) => setB(e.target.value)}>{BOXES.map((x) => <option key={x}>{x}</option>)}</select><select value={result} onChange={(e) => setResult(e.target.value)}>{RESULTS.map((x) => <option key={x}>{x}</option>)}</select></>}
+                <select value={playerId} onChange={(e) => setPlayerId(e.target.value)}><option value="">Atleta</option>{roster.map((p) => <option key={p.player_id} value={p.player_id}>{p.player_name}</option>)}</select>
                 <button type="submit">Registar</button>
               </div>
             </form>
           </div>
           <StatsPanel events={events} homeId={match.home_team_id} awayId={match.away_team_id} homeName={match.home_team_name} awayName={match.away_team_name} onPick={setFilter} />
-          {filter && <p className="muted">Filtro activo. <button type="button" onClick={() => setFilter(null)}>Ver tudo</button></p>}
+          {filter && <button type="button" onClick={() => setFilter(null)}>Ver tudo</button>}
           <TimelinePanel events={shown} stints={filter ? [] : stints} players={players} hideStints={!!filter} />
         </>
       )}
