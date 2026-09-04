@@ -1,56 +1,74 @@
 import { FormEvent, useState } from "react";
 import { load, save, uid, type Store } from "../data/localStore";
+import { clientId, connectDrive, isDriveConnected, pullFromDrive, pushToDrive } from "../data/driveSync";
 
 export default function ClubAdmin() {
   const [db, setDb] = useState<Store>(() => load());
-  function commit(next: Store) {
+  const [drive, setDrive] = useState(isDriveConnected());
+  const [msg, setMsg] = useState("");
+
+  async function commit(next: Store) {
     save(next);
     setDb(next);
+    if (isDriveConnected()) {
+      try {
+        await pushToDrive(next);
+        setMsg("Guardado no Drive");
+      } catch (e: any) {
+        setMsg(e.message);
+      }
+    }
   }
+
+  async function ligar() {
+    try {
+      setMsg("A pedir autorização Google…");
+      await connectDrive();
+      setDrive(true);
+      const remote = await pullFromDrive();
+      if (remote && (remote.clubs?.length || remote.players?.length)) {
+        save(remote as Store);
+        setDb({ ...load(), ...remote });
+        setMsg("Drive ligado. Dados remotos carregados.");
+      } else {
+        await pushToDrive(load());
+        setMsg("Drive ligado. Cópia enviada.");
+      }
+    } catch (e: any) {
+      setMsg(e.message);
+    }
+  }
+
   function exportJson() {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: "application/json" }));
     a.download = "at-analyser-db.json";
     a.click();
   }
-  function importJson(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const next = JSON.parse(String(reader.result));
-        commit({
-          clubs: next.clubs || [],
-          age_groups: next.age_groups || [],
-          seasons: next.seasons || [],
-          championships: next.championships || [],
-          teams: next.teams || [],
-          championship_teams: next.championship_teams || [],
-          players: next.players || [],
-          matches: next.matches || [],
-        });
-      } catch {
-        alert("Ficheiro inválido");
-      }
-    };
-    reader.readAsText(file);
-  }
+
   return (
     <div>
-      <p className="muted">Dados neste browser. Exporta o JSON e põe-o na pasta Drive «AT Analyser», ou importa o ficheiro de lá.</p>
+      <p className="muted">
+        Cada Guardar grava neste browser. Com o Drive ligado, grava também na cloud.
+      </p>
       <div className="row">
+        <button type="button" onClick={ligar} disabled={!clientId() && false}>
+          {drive ? "Drive ligado" : "Ligar Google Drive"}
+        </button>
         <button type="button" onClick={exportJson}>Exportar JSON</button>
-        <label className="muted">
-          Importar{" "}
-          <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
-        </label>
       </div>
+      {!clientId() && (
+        <p className="note">
+          Falta o Client ID. Segue o guia docs/DRIVE.md (console.cloud.google.com) e põe VITE_GOOGLE_CLIENT_ID no .env.
+        </p>
+      )}
+      {msg && <p className="muted">{msg}</p>}
       <div className="grid">
         <FormCard title="Clube" onSubmit={(fd) => commit({ ...db, clubs: [...db.clubs, { id: uid("club"), name: fd.name, city: fd.city }] })}>
           <input name="name" placeholder="Nome do clube" required />
           <input name="city" placeholder="Cidade" />
         </FormCard>
-        <FormCard title="Escalão" onSubmit={(fd) => commit({ ...db, age_groups: [...db.age_groups, { id: uid("ag"), club_id: fd.club_id, code: fd.code, name: fd.name, gender: fd.gender }] })}>
+        <FormCard title="Escalão" onSubmit={(fd) => commit({ ...db, age_groups: [...db.age_groups, { id: uid("ag"), club_id: fd.club_id, code: fd.code, name: fd.name, gender: fd.gender || "F" }] })}>
           <Select name="club_id" options={db.clubs} labelKey="name" />
           <input name="code" placeholder="SUB14F" required />
           <input name="name" placeholder="Sub-14 feminino" required />
@@ -74,7 +92,7 @@ export default function ClubAdmin() {
           <Select name="age_group_id" options={db.age_groups} labelKey="name" />
           <Select name="age_group_id_2" options={db.age_groups} labelKey="name" allowEmpty placeholder="2.º escalão" />
         </FormCard>
-        <FormCard title="Jogo" onSubmit={(fd) => commit({ ...db, matches: [...db.matches, { id: uid("mt"), season_id: fd.season_id || null, championship_id: fd.championship_id || null, home_team_id: fd.home_team_id, away_team_id: fd.away_team_id }] })}>
+        <FormCard title="Jogo" onSubmit={(fd) => commit({ ...db, matches: [...db.matches, { id: uid("mt"), championship_id: fd.championship_id || null, home_team_id: fd.home_team_id, away_team_id: fd.away_team_id }] })}>
           <Select name="championship_id" options={db.championships} labelKey="name" allowEmpty />
           <Select name="home_team_id" options={db.teams} labelKey="name" />
           <Select name="away_team_id" options={db.teams} labelKey="name" />
