@@ -5,7 +5,7 @@ import { formatClock } from "../domain/time";
 const TYPES = [
   "SHOT", "ASSIST", "PRE_ASSIST", "TURNOVER", "STEAL", "INTERCEPTION", "RECOVERY",
   "DEFENSIVE_BLOCK", "SEVEN_METER_WON", "TWO_MIN_RECEIVED", "TWO_MIN_DRAWN",
-  "GOALKEEPER_SAVE", "SUBSTITUTION_IN", "SUBSTITUTION_OUT",
+  "GOALKEEPER_SAVE",
 ];
 const ZONES = ["Z1","Z2","Z3","Z4","Z5","Z6","Z7","Z8","Z9"];
 const BOXES = ["B1","B2","B3","B4","B5","B6","B7","B8","B9"];
@@ -16,15 +16,27 @@ function parseClock(v: string) {
   if (!m) return Number(v) || 0;
   return Number(m[1]) * 60 + Number(m[2]);
 }
-
 function ytId(url: string) {
   const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
   return m?.[1] || null;
+}
+function minutesOf(stints: any[], playerId: string) {
+  return stints
+    .filter((s) => s.player_id === playerId)
+    .reduce((acc, s) => {
+      const end = s.end_timestamp >= 99999 ? s.start_timestamp : s.end_timestamp;
+      return acc + Math.max(0, end - s.start_timestamp);
+    }, 0) / 60;
+}
+function onCourt(stints: any[], playerId: string) {
+  return stints.some((s) => s.player_id === playerId && s.end_timestamp >= 99999);
 }
 
 export default function FichaJogo() {
   const [matches, setMatches] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
+  const [squad, setSquad] = useState<any[]>([]);
+  const [stints, setStints] = useState<any[]>([]);
   const [matchId, setMatchId] = useState("");
   const [events, setEvents] = useState<any[]>([]);
   const [video, setVideo] = useState("");
@@ -40,25 +52,31 @@ export default function FichaJogo() {
   const match = matches.find((m) => m.id === matchId);
 
   async function loadLists() {
-    const [ms, ps] = await Promise.all([get("/matches"), get("/players")]);
+    const ms = await get("/matches");
+    const ps = await get("/players");
     setMatches(ms); setPlayers(ps);
     if (!matchId && ms[0]) setMatchId(ms[0].id);
   }
-  async function loadEvents(id: string) {
+  async function loadMatch(id: string) {
     if (!id) return;
-    const ev = await get(`/events?match_id=${id}`);
-    setEvents(ev);
-    const m = matches.find((x) => x.id === id);
+    const [ev, sq, st, ms] = await Promise.all([
+      get(`/events?match_id=${id}`),
+      get(`/match-squads?match_id=${id}`),
+      get(`/stints?match_id=${id}`),
+      get("/matches"),
+    ]);
+    setEvents(ev); setSquad(sq); setStints(st); setMatches(ms);
+    const m = ms.find((x: any) => x.id === id);
     if (m?.video_url) setVideo(m.video_url);
   }
 
   useEffect(() => { loadLists().catch(() => {}); }, []);
-  useEffect(() => { if (matchId) loadEvents(matchId).catch(() => setEvents([])); }, [matchId]);
+  useEffect(() => { if (matchId) loadMatch(matchId).catch(() => {}); }, [matchId]);
 
   const roster = useMemo(() => {
-    if (!match) return players;
-    return players;
-  }, [players, match]);
+    if (!teamId) return squad;
+    return squad.filter((s) => s.team_id === teamId);
+  }, [squad, teamId]);
 
   async function saveVideo() {
     if (!matchId) return;
@@ -80,7 +98,23 @@ export default function FichaJogo() {
       notes,
     });
     setNotes("");
-    await loadEvents(matchId);
+    await loadMatch(matchId);
+  }
+
+  async function inOut(row: any, kind: "in" | "out") {
+    const ts = parseClock(clock);
+    if (kind === "in") {
+      await post("/stints/in", {
+        match_id: matchId,
+        player_id: row.player_id,
+        team_id: row.team_id,
+        position_played: row.primary_position,
+        timestamp_seconds: ts,
+      });
+    } else {
+      await post("/stints/out", { match_id: matchId, player_id: row.player_id, timestamp_seconds: ts });
+    }
+    await loadMatch(matchId);
   }
 
   const embed = video ? ytId(video) : null;
@@ -88,11 +122,11 @@ export default function FichaJogo() {
   return (
     <div>
       <h2>Ficha de jogo</h2>
-      <p className="muted">Escolhe o jogo, cola o vídeo e marca acções no relógio do jogo (mm:ss).</p>
+      <p className="muted">Só aparecem as convocadas. Usa o relógio para acções e para entradas/saídas.</p>
       <div className="card" style={{ marginBottom: 12 }}>
         <select value={matchId} onChange={(e) => setMatchId(e.target.value)}>
           <option value="">Jogo</option>
-          {matches.map((m) => <option key={m.id} value={m.id}>{m.home_team_name} vs {m.away_team_name} · {m.id}</option>)}
+          {matches.map((m) => <option key={m.id} value={m.id}>{m.home_team_name} vs {m.away_team_name}</option>)}
         </select>
       </div>
       {match && (
@@ -101,29 +135,25 @@ export default function FichaJogo() {
             <div className="card">
               <h3>Vídeo</h3>
               <div className="stack">
-                <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="https://youtube.com/... ou ficheiro" />
+                <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="URL do vídeo" />
                 <button type="button" onClick={saveVideo}>Guardar ligação</button>
               </div>
               <div style={{ marginTop: 12 }}>
-                {embed ? (
-                  <iframe title="video" width="100%" height="240" src={`https://www.youtube.com/embed/${embed}`} allowFullScreen />
-                ) : video ? (
-                  <video src={video} controls style={{ width: "100%" }} />
-                ) : <p className="muted">Sem vídeo.</p>}
+                {embed ? <iframe title="video" width="100%" height="220" src={`https://www.youtube.com/embed/${embed}`} allowFullScreen /> : video ? <video src={video} controls style={{ width: "100%" }} /> : <p className="muted">Sem vídeo.</p>}
               </div>
             </div>
             <form className="card" onSubmit={addEvent}>
-              <h3>Marcar evento</h3>
+              <h3>Marcar acção</h3>
               <div className="stack">
                 <input value={clock} onChange={(e) => setClock(e.target.value)} placeholder="12:30" />
-                <select value={teamId} onChange={(e) => setTeamId(e.target.value)} required>
+                <select value={teamId} onChange={(e) => { setTeamId(e.target.value); setPlayerId(""); }} required>
                   <option value="">Equipa</option>
                   <option value={match.home_team_id}>{match.home_team_name}</option>
                   <option value={match.away_team_id}>{match.away_team_name}</option>
                 </select>
                 <select value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
-                  <option value="">Atleta</option>
-                  {roster.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  <option value="">Atleta convocada</option>
+                  {roster.map((p) => <option key={p.player_id} value={p.player_id}>{p.player_name}</option>)}
                 </select>
                 <select value={type} onChange={(e) => setType(e.target.value)}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
                 {type === "SHOT" && (
@@ -134,20 +164,48 @@ export default function FichaJogo() {
                   </>
                 )}
                 <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Nota" />
-                <button type="submit">Registar</button>
+                <button type="submit">Registar acção</button>
               </div>
             </form>
           </div>
+
+          <div className="card" style={{ marginTop: 12 }}>
+            <h3>Tempo em campo</h3>
+            <p className="muted">Relógio actual: {clock}. Titular: põe Entrar a 00:00 no início.</p>
+            {!squad.length && <p className="note">Define a convocatória em Jogos primeiro.</p>}
+            <table>
+              <thead><tr><th>Atleta</th><th>Equipa</th><th>Min</th><th>Estado</th><th></th></tr></thead>
+              <tbody>
+                {squad.map((row) => {
+                  const min = minutesOf(stints, row.player_id);
+                  const live = onCourt(stints, row.player_id);
+                  return (
+                    <tr key={row.player_id}>
+                      <td>{row.player_name}{row.starter ? " · tit." : ""}</td>
+                      <td>{row.team_name}</td>
+                      <td>{min.toFixed(1)}</td>
+                      <td>{live ? "em campo" : "banco"}</td>
+                      <td>
+                        {live
+                          ? <button type="button" onClick={() => inOut(row, "out")}>Sair {clock}</button>
+                          : <button type="button" onClick={() => inOut(row, "in")}>Entrar {clock}</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
           <div className="card" style={{ marginTop: 12 }}>
             <h3>Linha de eventos ({events.length})</h3>
             <table>
-              <thead><tr><th>Relógio</th><th>Bloco</th><th>Tipo</th><th>Atleta</th><th>Remate</th><th>Nota</th></tr></thead>
+              <thead><tr><th>Relógio</th><th>Bloco</th><th>Tipo</th><th>Atleta</th><th>Remate</th></tr></thead>
               <tbody>
                 {events.map((ev) => {
-                  let shot: any = null;
-                  try { shot = ev.shot_json ? JSON.parse(ev.shot_json) : null; } catch { shot = null; }
-                  let ctx: any = {};
-                  try { ctx = ev.context_json ? JSON.parse(ev.context_json) : {}; } catch { ctx = {}; }
+                  let shot: any = null; let ctx: any = {};
+                  try { shot = ev.shot_json ? JSON.parse(ev.shot_json) : null; } catch { /* */ }
+                  try { ctx = ev.context_json ? JSON.parse(ev.context_json) : {}; } catch { /* */ }
                   const pl = players.find((p) => p.id === ev.player_id);
                   return (
                     <tr key={ev.id}>
@@ -156,7 +214,6 @@ export default function FichaJogo() {
                       <td>{ev.type}</td>
                       <td>{pl?.name || "—"}</td>
                       <td>{shot ? `${shot.field_shot_zone} → ${shot.goal_target_zone || "—"} (${shot.shot_result})` : "—"}</td>
-                      <td>{ev.notes || "—"}</td>
                     </tr>
                   );
                 })}
