@@ -21,6 +21,7 @@ export async function migrate(db) {
   for (const stmt of sql.split(";").map((s) => s.trim()).filter((s) => s && !s.startsWith("--"))) {
     await db.execute(stmt);
   }
+  try { await db.execute("ALTER TABLE player_team_season ADD COLUMN left_at TEXT"); } catch { /* already there */ }
 }
 
 export function id(prefix) {
