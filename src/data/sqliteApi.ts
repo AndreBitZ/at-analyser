@@ -1,5 +1,3 @@
-export type Health = { ok: boolean; mode: string } | null;
-
 export async function api(path: string, init?: RequestInit) {
   const res = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -10,10 +8,9 @@ export async function api(path: string, init?: RequestInit) {
   return data;
 }
 
-export async function probeSqlite(): Promise<Health> {
+export async function probeSqlite() {
   try {
-    const h = await api("/health");
-    return h;
+    return await api("/health");
   } catch {
     return null;
   }
