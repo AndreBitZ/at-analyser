@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { getWorkspace } from "./workspace.js";
 
@@ -48,9 +48,10 @@ export function runBackup() {
   mkdirSync(destRoot, { recursive: true });
   const target = join(destRoot, `AT-Analyser-${stamp()}`);
   mkdirSync(target, { recursive: true });
+  const skip = join("exportacoes", "backups");
   cpSync(root, target, {
     recursive: true,
-    filter: (src) => !src.includes(`${join("exportacoes", "backups")}`) && !src.endsWith("-wal") && !src.endsWith("-shm"),
+    filter: (src) => !src.includes(skip) && !src.endsWith("-wal") && !src.endsWith("-shm"),
   });
   last = { at: new Date().toISOString(), target };
   lastError = null;
@@ -66,7 +67,7 @@ function prune(destRoot, keep) {
       .sort();
     while (dirs.length > keep) {
       const old = dirs.shift();
-      cpSync(join(destRoot, old), join(destRoot, old), { recursive: true });
+      rmSync(join(destRoot, old), { recursive: true, force: true });
     }
   } catch {
     /* ignore */
@@ -83,10 +84,6 @@ export function armTimer() {
   const cfg = loadSettings();
   if (!cfg.enabled) return;
   timer = setInterval(() => {
-    try {
-      runBackup();
-    } catch (e) {
-      lastError = String(e.message || e);
-    }
+    try { runBackup(); } catch (e) { lastError = String(e.message || e); }
   }, cfg.intervalMinutes * 60 * 1000);
 }
