@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, probeSqlite } from "../data/sqliteApi";
+import BackupPanel from "./BackupPanel";
 
 type Box = Record<string, any[]>;
 
@@ -12,9 +13,9 @@ export default function ClubAdmin() {
 
   async function reload() {
     const health = await probeSqlite();
-    if (!health?.ok) {
+    if (!health?.ok || !health.ready) {
       setOk(false);
-      setErr("Servidor SQLite desligado. No PC corre: npm run server");
+      setErr("Escolhe a pasta de dados no ecrã inicial e confirma que npm run server está a correr.");
       return;
     }
     setOk(true);
@@ -35,9 +36,8 @@ export default function ClubAdmin() {
   if (!ok) {
     return (
       <div className="card">
-        <h3>SQLite local</h3>
+        <h3>Pasta de dados</h3>
         <p className="note">{err}</p>
-        <p className="muted">Abre um terminal na pasta do projeto e corre <code>npm run server</code>. Depois recarrega esta página. Os dados ficam em <code>data/at-analyser.db</code>.</p>
         <button type="button" onClick={() => reload()}>Tentar outra vez</button>
       </div>
     );
@@ -45,8 +45,8 @@ export default function ClubAdmin() {
 
   return (
     <div>
-      <p className="muted">A gravar em data/at-analyser.db (só neste PC).</p>
-      <div className="grid">
+      <BackupPanel />
+      <div className="grid" style={{ marginTop: 16 }}>
         <FormCard title="Clube" onSubmit={(fd) => post("/clubs", fd)}>
           <input name="name" placeholder="Nome do clube" required />
           <input name="city" placeholder="Cidade" />
@@ -67,10 +67,6 @@ export default function ClubAdmin() {
           <Select name="club_id" options={db.clubs} labelKey="name" />
           <Select name="age_group_id" options={db.age_groups} labelKey="name" />
           <input name="name" placeholder="Nome da equipa" required />
-        </FormCard>
-        <FormCard title="Inscrever equipa" onSubmit={(fd) => post("/championship-teams", fd)}>
-          <Select name="championship_id" options={db.championships} labelKey="name" />
-          <Select name="team_id" options={db.teams} labelKey="name" />
         </FormCard>
         <FormCard title="Jogadora (2 escalões)" onSubmit={(fd) => post("/players", { ...fd, age_group_ids: [fd.age_group_id, fd.age_group_id_2].filter(Boolean), is_goalkeeper: fd.primary_position === "GK" })}>
           <Select name="club_id" options={db.clubs} labelKey="name" />
