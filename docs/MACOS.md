@@ -1,27 +1,36 @@
-# AT Analyser no Mac
+# AT Analyser — só Mac com chip M
 
-App pensada para macOS. Dados no disco do Mac (pasta à tua escolha ou `~/Library/Application Support/AT-Analyser`).
+App nativa **arm64** (M1 / M2 / M3 / M4). Não há versão Intel.
 
-## Abrir como aplicação
+## Abrir em desenvolvimento
+
+No Mac com chip Apple:
+
+```bash
+git pull
+npm install
+npm run mac
+```
+
+Confirma a arquitectura:
+
+```bash
+uname -m
+# deve dizer arm64
+```
+
+## Gerar o .dmg Apple Silicon
 
 ```bash
 cd macos
 npm install
-npm start
-```
-
-Abre uma janela nativa. No primeiro ecrã podes:
-- usar o diálogo do Finder (Electron)
-- ou a pasta padrão do macOS
-
-## Gerar o .app / .dmg
-
-```bash
-cd macos
 npm run pack
 ```
 
-## Só terminal (sem Electron)
+O ficheiro sai com o nome `AT Analyser-0.3.0-apple-silicon.dmg`.
+Instala no Applications. Na primeira abertura: *Sistema > Privacidade* se o Gatekeeper avisar (build sem assinatura Apple Developer).
 
-Na raiz do projecto: `npm start` e no browser `http://localhost:5173`.
-No Mac a escolha de pasta usa o diálogo nativo (`osascript`).
+## Dados
+
+Pasta à tua escolha no Finder, ou:
+`~/Library/Application Support/AT-Analyser`
