@@ -2,8 +2,9 @@ import { useState } from "react";
 import WorkspaceGate from "./WorkspaceGate";
 import { Atletas, Campeonatos, Clubes, Epocas, Geral, Jogos } from "./Pages";
 import FichaJogo from "./FichaJogo";
+import Regulamento from "./Regulamento";
 
-type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha";
+type Page = "geral" | "epoca" | "campeonato" | "clube" | "atletas" | "jogos" | "ficha" | "ihf";
 
 const MENU: { id: Page; label: string }[] = [
   { id: "geral", label: "Geral" },
@@ -13,6 +14,7 @@ const MENU: { id: Page; label: string }[] = [
   { id: "atletas", label: "Atletas" },
   { id: "jogos", label: "Jogos" },
   { id: "ficha", label: "Ficha de jogo" },
+  { id: "ihf", label: "Regulamento IHF" },
 ];
 
 export default function App() {
@@ -41,6 +43,7 @@ export default function App() {
         {page === "atletas" && <Atletas />}
         {page === "jogos" && <Jogos />}
         {page === "ficha" && <FichaJogo />}
+        {page === "ihf" && <Regulamento />}
       </main>
     </div>
   );
