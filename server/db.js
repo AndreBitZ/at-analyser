@@ -22,6 +22,13 @@ export async function migrate(db) {
     await db.execute(stmt);
   }
   try { await db.execute("ALTER TABLE player_team_season ADD COLUMN left_at TEXT"); } catch { /* already there */ }
+  await db.execute(`CREATE TABLE IF NOT EXISTS match_squads (
+    match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    team_id TEXT NOT NULL REFERENCES teams(id),
+    player_id TEXT NOT NULL REFERENCES players(id),
+    starter INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (match_id, player_id)
+  )`);
 }
 
 export function id(prefix) {
