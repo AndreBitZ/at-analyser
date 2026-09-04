@@ -65,7 +65,18 @@ CREATE TABLE IF NOT EXISTS player_team_season (
   player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   season_id TEXT NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+  left_at TEXT,
   PRIMARY KEY (player_id, team_id, season_id)
+);
+
+CREATE TABLE IF NOT EXISTS player_transfers (
+  id TEXT PRIMARY KEY,
+  player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  from_team_id TEXT REFERENCES teams(id),
+  to_team_id TEXT NOT NULL REFERENCES teams(id),
+  season_id TEXT NOT NULL REFERENCES seasons(id),
+  transferred_at TEXT NOT NULL DEFAULT (datetime('now')),
+  notes TEXT
 );
 
 CREATE TABLE IF NOT EXISTS matches (
