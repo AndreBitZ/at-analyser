@@ -3,6 +3,7 @@ import { get, post, patch } from "./adminApi";
 import BackupPanel from "./BackupPanel";
 import { BarList, Donut } from "./Charts";
 import { MatchHistory } from "./History";
+import Convocatoria from "./Convocatoria";
 
 type Fd = Record<string, string>;
 function norm(rows: any[] | undefined) {
@@ -105,7 +106,6 @@ export function Clubes() {
   return (
     <div>
       <h2>Clube</h2>
-      <p className="muted">Um clube tem um ID fixo. No mesmo clube podes criar vários escalões e várias equipas (sénior M, sénior F, sub-18 F, …). Cada equipa tem o seu ID.</p>
       <Form title={edit ? "Editar clube" : "Novo clube"} onSubmit={async (fd) => {
         if (edit) await patch(`/clubs/${edit.id}`, fd); else await post("/clubs", fd);
         setEdit(null); await load();
@@ -115,32 +115,23 @@ export function Clubes() {
       </Form>
       <Form title="Escalão do clube" onSubmit={async (fd) => { await post("/age-groups", fd); await load(); }}>
         <Select name="club_id" options={clubs} labelKey="name" />
-        <input name="code" placeholder="SENF / SENM / SUB18F" required />
+        <input name="code" placeholder="SENF" required />
         <input name="name" placeholder="Sénior feminino" required />
-        <select name="gender" defaultValue="F">
-          <option value="F">Feminino</option>
-          <option value="M">Masculino</option>
-          <option value="X">Misto</option>
-        </select>
+        <select name="gender" defaultValue="F"><option value="F">Feminino</option><option value="M">Masculino</option><option value="X">Misto</option></select>
       </Form>
       <Form title="Nova equipa neste clube" onSubmit={async (fd) => { await post("/teams", fd); await load(); }}>
         <Select name="club_id" options={clubs} labelKey="name" />
         <Select name="age_group_id" options={groups} labelKey="name" />
-        <input name="name" placeholder="Ex.: Sénior feminino" required />
-        <input name="short_name" placeholder="Sigla (SF)" />
+        <input name="name" placeholder="Nome da equipa" required />
       </Form>
-      <table><thead><tr><th>ID clube</th><th>Clube</th><th>Cidade</th><th></th></tr></thead>
-        <tbody>{clubs.map((c) => <tr key={c.id}><td><code>{c.id}</code></td><td>{c.name}</td><td>{c.city || "—"}</td><td>
+      <table><thead><tr><th>ID clube</th><th>Clube</th><th></th></tr></thead>
+        <tbody>{clubs.map((c) => <tr key={c.id}><td><code>{c.id}</code></td><td>{c.name}</td><td>
           <button type="button" onClick={() => setEdit(c)}>Editar</button>{" "}
           <button type="button" onClick={() => setSeen(c)}>Historial</button>
         </td></tr>)}</tbody></table>
-      <h3>Escalões</h3>
-      <table><thead><tr><th>ID</th><th>Código</th><th>Nome</th><th>Sexo</th></tr></thead>
-        <tbody>{groups.map((g) => <tr key={g.id}><td><code>{g.id}</code></td><td>{g.code}</td><td>{g.name}</td><td>{g.gender}</td></tr>)}</tbody></table>
-      <h3>Equipas (várias por clube)</h3>
-      <table><thead><tr><th>ID equipa</th><th>Equipa</th><th>ID clube</th><th>Clube</th><th>Escalão</th></tr></thead>
-        <tbody>{teams.map((t) => <tr key={t.id}><td><code>{t.id}</code></td><td>{t.name}</td><td><code>{t.club_id}</code></td><td>{t.club_name}</td><td>{t.age_group_code}</td></tr>)}</tbody></table>
-      <MatchHistory title={seen ? `Jogos do clube — ${seen.name}` : "Historial do clube"} path={seen ? `/clubs/${seen.id}/matches` : null} />
+      <table><thead><tr><th>ID equipa</th><th>Equipa</th><th>Clube</th></tr></thead>
+        <tbody>{teams.map((t) => <tr key={t.id}><td><code>{t.id}</code></td><td>{t.name}</td><td>{t.club_name}</td></tr>)}</tbody></table>
+      <MatchHistory title={seen ? `Jogos do clube — ${seen.name}` : "Historial"} path={seen ? `/clubs/${seen.id}/matches` : null} />
     </div>
   );
 }
@@ -161,7 +152,6 @@ export function Atletas() {
   return (
     <div>
       <h2>Atletas</h2>
-      <p className="muted">Cada atleta tem um ID único. Pode estar em duas equipas/escalões do mesmo clube (ex. sub-18 F e sénior F). Transferir não muda o ID.</p>
       <Form title={edit ? "Editar atleta" : "Novo atleta"} onSubmit={async (fd) => {
         if (edit) await patch(`/players/${edit.id}`, fd);
         else await post("/players", { ...fd, age_group_ids: [fd.age_group_id, fd.age_group_id_2].filter(Boolean), is_goalkeeper: fd.primary_position === "GK" });
@@ -179,18 +169,12 @@ export function Atletas() {
         <Select name="team_id" options={teams} labelKey="name" extra="club_name" />
         <Select name="season_id" options={seasons} labelKey="label" />
       </Form>
-      <Form title="Transferir" onSubmit={async (fd) => { await post("/transfers", fd); await load(); }}>
-        <Select name="player_id" options={players} labelKey="name" />
-        <Select name="from_team_id" options={teams} labelKey="name" extra="club_name" allowEmpty placeholder="Origem" />
-        <Select name="to_team_id" options={teams} labelKey="name" extra="club_name" />
-        <Select name="season_id" options={seasons} labelKey="label" />
-      </Form>
-      <table><thead><tr><th>ID atleta</th><th>Nome</th><th>ID clube</th><th>Nº</th><th>Pos.</th><th></th></tr></thead>
-        <tbody>{players.map((p) => <tr key={p.id}><td><code>{p.id}</code></td><td>{p.name}</td><td><code>{p.club_id}</code></td><td>{p.shirt_number ?? "—"}</td><td>{p.primary_position}</td><td>
+      <table><thead><tr><th>ID</th><th>Nome</th><th></th></tr></thead>
+        <tbody>{players.map((p) => <tr key={p.id}><td><code>{p.id}</code></td><td>{p.name}</td><td>
           <button type="button" onClick={() => setEdit(p)}>Editar</button>{" "}
           <button type="button" onClick={() => setSeen(p)}>Jogos</button>
         </td></tr>)}</tbody></table>
-      <MatchHistory title={seen ? `Jogos de ${seen.name}` : "Historial da atleta"} path={seen ? `/players/${seen.id}/matches` : null} />
+      <MatchHistory title={seen ? `Jogos de ${seen.name}` : "Historial"} path={seen ? `/players/${seen.id}/matches` : null} />
     </div>
   );
 }
@@ -201,12 +185,13 @@ export function Jogos() {
   const [teams, setTeams] = useState<any[]>([]);
   const [seasons, setSeasons] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
+  const [conv, setConv] = useState<any>(null);
   const load = async () => { setRows(await get("/matches")); setChamps(await get("/championships")); setTeams(await get("/teams")); setSeasons(await get("/seasons")); };
   useEffect(() => { load(); }, []);
   return (
     <div>
       <h2>Jogos</h2>
-      <p className="muted">Casa e fora são equipas (não o clube). O mesmo clube pode ter sénior M e sénior F a jogar jogos diferentes.</p>
+      <p className="muted">Depois de criar o jogo, abre Convocatória e marca as atletas de casa e fora.</p>
       <Form title={edit ? "Editar jogo" : "Novo jogo"} onSubmit={async (fd) => {
         if (edit) await patch(`/matches/${edit.id}`, fd); else await post("/matches", fd);
         setEdit(null); await load();
@@ -218,8 +203,12 @@ export function Jogos() {
         <input name="kickoff_iso" type="datetime-local" defaultValue={edit?.kickoff_iso || ""} />
         <input name="venue" placeholder="Pavilhão" defaultValue={edit?.venue || ""} />
       </Form>
-      <table><thead><tr><th>ID</th><th>Casa</th><th>Fora</th><th>Campeonato</th><th></th></tr></thead>
-        <tbody>{rows.map((m) => <tr key={m.id}><td><code>{m.id}</code></td><td>{m.home_team_name}</td><td>{m.away_team_name}</td><td>{m.championship_name || "—"}</td><td><button type="button" onClick={() => setEdit(m)}>Editar</button></td></tr>)}</tbody></table>
+      <table><thead><tr><th>ID</th><th>Casa</th><th>Fora</th><th></th></tr></thead>
+        <tbody>{rows.map((m) => <tr key={m.id}><td><code>{m.id}</code></td><td>{m.home_team_name}</td><td>{m.away_team_name}</td><td>
+          <button type="button" onClick={() => setEdit(m)}>Editar</button>{" "}
+          <button type="button" onClick={() => setConv(m)}>Convocatória</button>
+        </td></tr>)}</tbody></table>
+      {conv && <Convocatoria match={conv} />}
     </div>
   );
 }
@@ -229,9 +218,7 @@ function Select({ name, options, labelKey, allowEmpty, placeholder, defaultValue
     <select name={name} required={!allowEmpty} defaultValue={defaultValue || ""}>
       <option value="">{placeholder || (allowEmpty ? "—" : "Selecionar")}</option>
       {options.map((o: any) => (
-        <option key={o.id} value={o.id}>
-          {o[labelKey]}{extra && o[extra] ? ` · ${o[extra]}` : ""} · {o.id}
-        </option>
+        <option key={o.id} value={o.id}>{o[labelKey]}{extra && o[extra] ? ` · ${o[extra]}` : ""}</option>
       ))}
     </select>
   );
